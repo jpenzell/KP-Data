@@ -44,4 +44,4 @@ The program generates:
 - A console report with basic statistics
 - Information about missing data
 - A bar chart visualization showing data completeness
-- Detailed analysis of potential duplicate entries 
+- Detailed analysis of potential duplicate entries
