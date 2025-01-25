@@ -1,17 +1,15 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from wordcloud import WordCloud
+from datetime import datetime
 import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 import io
 from pathlib import Path
-from lms_content_analyzer import LMSContentAnalyzer
-from datetime import datetime
-import tempfile
-import numpy as np
 
-st.set_page_config(page_title="LMS Content Library Analyzer", layout="wide")
+from lms_content_analyzer import LMSContentAnalyzer
+
+st.set_page_config(page_title="LMS Content Analysis", layout="wide")
 
 def create_wordcloud(text):
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
@@ -36,181 +34,189 @@ def plot_quality_distribution(df):
     return fig
 
 def main():
-    st.title("LMS Content Library Analyzer")
-    st.write("Upload your LMS content spreadsheet for detailed analysis and insights.")
-
-    uploaded_file = st.file_uploader("Choose an Excel file", type=['xlsx', 'xls'])
-
+    st.title("LMS Content Analysis Dashboard")
+    
+    # File uploader
+    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+    
     if uploaded_file is not None:
-        # Save the uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            temp_path = tmp_file.name
-
         try:
-            # Initialize analyzer with the temporary file
-            analyzer = LMSContentAnalyzer(temp_path)
-            insights = analyzer.get_actionable_insights()
+            analyzer = LMSContentAnalyzer(uploaded_file)
             
-            # Create tabs for different analyses
+            # Create tabs
             tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "Executive Summary", 
-                "Content Quality", 
-                "Content Gaps & Redundancies",
-                "Temporal Analysis",
-                "Detailed Analysis"
+                "Data Quality",
+                "Training Categories",
+                "Delivery & Usage",
+                "Content Production",
+                "Financial Analysis"
             ])
             
             with tab1:
-                st.header("Executive Summary")
+                st.header("Data Quality Overview")
                 
-                # Key metrics
-                col1, col2, col3, col4 = st.columns(4)
+                # Get metrics
+                quality_metrics = analyzer.get_data_quality_metrics()
+                missing_data = analyzer.get_missing_data_summary()
+                value_distributions = analyzer.get_value_distributions()
+                date_ranges = analyzer.get_date_ranges()
+                text_stats = analyzer.get_text_field_stats()
+                recommendations = analyzer.get_recommendations()
+                
+                # Display metrics
+                col1, col2, col3 = st.columns(3)
+                
                 with col1:
-                    st.metric("Total Courses", len(analyzer.df))
+                    st.subheader("Completeness")
+                    completeness_df = pd.DataFrame.from_dict(quality_metrics['completeness'], orient='index', columns=['Score'])
+                    st.dataframe(completeness_df.style.format("{:.1f}%"))
+                
                 with col2:
-                    st.metric("Average Quality", f"{analyzer.df['quality_score'].mean():.2f}")
+                    st.subheader("Consistency")
+                    consistency_df = pd.DataFrame.from_dict(quality_metrics['consistency'], orient='index', columns=['Score'])
+                    st.dataframe(consistency_df.style.format("{:.1f}%"))
+                
                 with col3:
-                    st.metric("Needs Attention", len(analyzer.df[analyzer.df['needs_attention']]))
-                with col4:
-                    st.metric("Categories", len(analyzer.df['category_name'].unique()))
+                    st.subheader("Validity")
+                    validity_df = pd.DataFrame.from_dict(quality_metrics['validity'], orient='index', columns=['Score'])
+                    st.dataframe(validity_df.style.format("{:.1f}%"))
                 
-                # Urgent attention section
-                st.subheader("🚨 Urgent Attention Required")
-                if insights['urgent_attention_needed']:
-                    for course in insights['urgent_attention_needed'][:5]:  # Show top 5
-                        with st.expander(f"{course['course_title']} (Score: {course['quality_score']:.2f})"):
-                            st.write("Issues:")
-                            for issue in course['issues']:
-                                st.write(f"- Missing {issue.replace('_complete', '')}")
-                else:
-                    st.success("No courses require urgent attention!")
+                # Display recommendations
+                st.subheader("Recommendations")
+                for rec in recommendations:
+                    st.warning(rec)
                 
-                # Quick insights
-                st.subheader("📊 Quick Insights")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if insights['temporal_insights']:
-                        st.metric("Monthly New Content", 
-                                f"{insights['temporal_insights']['average_monthly_new_content']:.1f}")
-                        st.metric("Content Age Range", 
-                                f"{insights['temporal_insights']['oldest_content_age']:.1f} years")
-                
-                with col2:
-                    if insights['content_redundancies']:
-                        st.metric("Potential Redundancies", 
-                                len(insights['content_redundancies']))
-                    if insights['content_gaps']:
-                        st.metric("Categories with Gaps", 
-                                len(insights['content_gaps']))
-
+                # Display detailed stats
+                with st.expander("View Detailed Statistics"):
+                    st.subheader("Missing Data Summary")
+                    missing_df = pd.DataFrame.from_dict(missing_data, orient='index')
+                    st.dataframe(missing_df.style.format({
+                        'count': '{:,.0f}',
+                        'percentage': '{:.1f}%'
+                    }))
+                    
+                    st.subheader("Value Distributions")
+                    for col, dist in value_distributions.items():
+                        st.write(f"\n**{col}**")
+                        dist_df = pd.DataFrame.from_dict(dist, orient='index', columns=['Count'])
+                        st.dataframe(dist_df)
+                    
+                    st.subheader("Date Ranges")
+                    for col, ranges in date_ranges.items():
+                        st.write(f"\n**{col}**")
+                        st.write(f"Min: {ranges['min']}")
+                        st.write(f"Max: {ranges['max']}")
+                    
+                    st.subheader("Text Field Statistics")
+                    for col, stats in text_stats.items():
+                        st.write(f"\n**{col}**")
+                        st.write(f"Min length: {stats['min_length']:.0f}")
+                        st.write(f"Max length: {stats['max_length']:.0f}")
+                        st.write(f"Average length: {stats['avg_length']:.1f}")
+            
             with tab2:
-                st.header("Content Quality Analysis")
+                st.header("Training Categories Analysis")
                 
-                # Quality score distribution
-                st.subheader("Quality Score Distribution")
-                fig = plot_quality_distribution(analyzer.df)
+                # Training Split by Categories
+                st.subheader("Training Split by Categories")
+                category_data = analyzer.get_category_distribution()
+                fig = px.treemap(category_data, 
+                               path=['category_type', 'subcategory'],
+                               values='count',
+                               title='Training Distribution by Category')
                 st.plotly_chart(fig)
                 
-                # Quality improvement opportunities
-                st.subheader("🔄 Quality Improvement Opportunities")
-                if insights['quality_improvements']:
-                    for course in insights['quality_improvements']:
-                        with st.expander(f"{course['course_title']} (Score: {course['current_score']:.2f})"):
-                            for area, score in course['improvement_areas'].items():
-                                if score < 0.6:
-                                    st.write(f"- {area.title()}: {score:.2f}")
-                                    if area == 'description':
-                                        st.write("  → Add more detailed description")
-                                    elif area == 'metadata':
-                                        st.write("  → Complete missing metadata fields")
-                                    elif area == 'freshness':
-                                        st.write("  → Review and update content")
-                                    elif area == 'keywords':
-                                        st.write("  → Add more relevant keywords")
-
-            with tab3:
-                st.header("Content Gaps & Redundancies")
-                
+                # Training Focus by Persona
+                st.subheader("Training Focus by Persona")
                 col1, col2 = st.columns(2)
-                
                 with col1:
-                    st.subheader("📉 Content Gaps")
-                    if insights['content_gaps']:
-                        for gap in insights['content_gaps']:
-                            with st.expander(f"{gap['category']}"):
-                                st.write(f"Current Count: {gap['current_count']}")
-                                st.write(f"Gap Percentage: {gap['gap_percentage']:.1f}%")
-                                st.write(f"Average Category Count: {gap['avg_category_count']:.1f}")
-                    else:
-                        st.info("No significant content gaps detected")
+                    persona_data = analyzer.get_persona_distribution()
+                    fig = px.pie(persona_data, 
+                               values='percentage',
+                               names='persona',
+                               title='Training Split by Persona')
+                    st.plotly_chart(fig)
                 
+                # Top 10 Learner Interests
                 with col2:
-                    st.subheader("🔄 Content Redundancies")
-                    if insights['content_redundancies']:
-                        for redundancy in insights['content_redundancies']:
-                            with st.expander(f"{redundancy['course']}"):
-                                for similar in redundancy['similar_courses']:
-                                    st.write(f"- {similar['title']}")
-                                    st.write(f"  Similarity: {similar['similarity_score']:.2f}")
-                    else:
-                        st.info("No significant content redundancies detected")
-
+                    interests = analyzer.get_top_learner_interests()
+                    fig = px.bar(interests,
+                               x='interest',
+                               y='count',
+                               title='Most Popular Learning Areas')
+                    st.plotly_chart(fig)
+            
+            with tab3:
+                st.header("Delivery & Usage Analysis")
+                
+                # Training Delivery Split
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Training Delivery Methods")
+                    delivery_data = analyzer.get_delivery_split()
+                    fig = px.pie(delivery_data,
+                               values='percentage',
+                               names='method',
+                               title='Training Delivery Split')
+                    st.plotly_chart(fig)
+                
+                # Content Usage Length
+                with col2:
+                    st.subheader("Content Usage Length")
+                    usage_data = analyzer.get_content_usage_length()
+                    fig = px.bar(usage_data,
+                               x='duration',
+                               y='percentage',
+                               title='Content Usage Duration')
+                    st.plotly_chart(fig)
+            
             with tab4:
-                st.header("Temporal Analysis")
+                st.header("Content Production Analysis")
                 
-                # Content velocity
-                if insights['temporal_insights']:
-                    st.subheader("📈 Content Velocity")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("New Content (6 months)", 
-                                insights['temporal_insights']['content_velocity'])
-                        st.metric("Monthly Average", 
-                                f"{insights['temporal_insights']['average_monthly_new_content']:.1f}")
-                    
-                    # Category trends
-                    st.subheader("📊 Category Trends")
-                    if insights['category_distribution']:
-                        trend_data = pd.DataFrame(insights['category_distribution'])
-                        fig = px.bar(trend_data, x='category', y='percentage',
-                                   color='trend',
-                                   title='Category Distribution and Trends')
-                        st.plotly_chart(fig)
-
+                # Content Source Distribution
+                st.subheader("Content by Source")
+                source_data = analyzer.get_content_source_distribution()
+                fig = px.pie(source_data,
+                           values='percentage',
+                           names='source',
+                           title='Content Source Distribution')
+                st.plotly_chart(fig)
+                
+                # Training Volume by Organization
+                st.subheader("Training Volume by Organization")
+                org_data = analyzer.get_training_volume_by_org()
+                fig = px.bar(org_data,
+                           x='organization',
+                           y='volume',
+                           title='Training Volume by Organization')
+                st.plotly_chart(fig)
+            
             with tab5:
-                st.header("Detailed Analysis")
+                st.header("Financial Analysis")
                 
-                # Text analysis
-                st.subheader("📝 Text Analysis")
-                text_analysis = analyzer.analyze_text_fields()
-                selected_field = st.selectbox(
-                    "Select field to analyze:",
-                    analyzer.text_columns
-                )
+                # Training Costs
+                st.subheader("Training Costs Analysis")
+                cost_metrics = analyzer.get_training_cost_metrics()
                 
-                if selected_field in text_analysis:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        all_text = ' '.join(analyzer.df[selected_field].astype(str).fillna(''))
-                        fig = create_wordcloud(all_text)
-                        st.pyplot(fig)
-                        plt.close()
-                    
-                    with col2:
-                        st.metric("Unique Values", text_analysis[selected_field]['unique_values'])
-                        st.metric("Average Length", f"{text_analysis[selected_field]['avg_length']:.1f}")
-                        
-                        # Top keywords
-                        st.write("Top Keywords:")
-                        keywords_df = pd.DataFrame(
-                            list(text_analysis[selected_field]['top_keywords'].items()),
-                            columns=['Keyword', 'Count']
-                        )
-                        st.dataframe(keywords_df)
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Avg Cost per Learner", f"${cost_metrics['avg_cost_per_learner']:,.2f}")
+                with col2:
+                    st.metric("Total Training Spend", f"${cost_metrics['total_training_spend']:,.2f}")
+                with col3:
+                    st.metric("Tuition Reimbursement", f"${cost_metrics['tuition_reimbursement']:,.2f}")
                 
-                # Export options
-                st.subheader("📤 Export Analysis")
+                # Cost Breakdown
+                st.subheader("Cost Breakdown by Role")
+                cost_by_role = analyzer.get_cost_by_role()
+                fig = px.bar(cost_by_role,
+                           x='role',
+                           y='yearly_average',
+                           title='Average Yearly Training Cost by Role')
+                st.plotly_chart(fig)
+                
+                # Export Report Option
+                st.subheader("📊 Export Analysis Report")
                 if st.button("Generate Detailed Report"):
                     report = analyzer.generate_enhanced_report()
                     report_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -220,12 +226,12 @@ def main():
                         file_name=f"lms_analysis_report_{report_time}.txt",
                         mime="text/plain"
                     )
-
+                
         except Exception as e:
             st.error(f"Error analyzing file: {str(e)}")
-        finally:
-            # Clean up temporary file
-            Path(temp_path).unlink()
+            st.exception(e)
+    else:
+        st.info("Please upload an Excel file to begin analysis.")
 
 if __name__ == "__main__":
     main() 
