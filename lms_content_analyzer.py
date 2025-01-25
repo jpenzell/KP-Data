@@ -36,7 +36,7 @@ class LMSContentAnalyzer:
             self._convert_date_columns()
             print(f"\nSuccessfully loaded {len(self.df)} rows of data")
         except Exception as e:
-            print(f"Error loading data: {str(e)}")
+            print("Error loading data:", str(e))  # Fixed string formatting
             raise
 
     def _clean_column_names(self):
@@ -96,69 +96,121 @@ class LMSContentAnalyzer:
         print(f"Categorical columns: {self.categorical_columns}")
 
     def _convert_date_columns(self):
+        """Convert date columns to datetime with proper error handling"""
         for col in self.date_columns:
             if col in self.df.columns:
                 try:
+                    # Convert to datetime and handle any format issues
                     self.df[col] = pd.to_datetime(self.df[col], errors='coerce')
+                    
+                    # Report on conversion results
+                    total_rows = len(self.df)
+                    valid_dates = self.df[col].notna().sum()
+                    if valid_dates < total_rows:
+                        print(f"Warning: {col} has {total_rows - valid_dates} invalid or missing dates")
+                    
+                    # Add quality flag for the column
+                    self.df[f"{col}_is_valid"] = self.df[col].notna()
+                    
                 except Exception as e:
-                    print(f"Warning: Could not convert {col} to datetime: {str(e)}")
+                    print("Error converting", col, "to datetime:", str(e))  # Fixed string formatting
+                    # Create a flag column even if conversion fails
+                    self.df[f"{col}_is_valid"] = False
 
     def get_data_quality_metrics(self):
         """Calculate overall data quality metrics"""
         metrics = {
-            'completeness': {},
-            'consistency': {},
-            'validity': {}
+            'completeness': 0,
+            'consistency': 0,
+            'validity': 0
         }
         
-        # Calculate completeness for each column
+        # Calculate completeness
+        completeness_scores = []
         for col in self.df.columns:
-            metrics['completeness'][col] = (1 - self.df[col].isna().mean()) * 100
-
-        # Calculate consistency for each column
+            if not col.endswith('_is_valid'):  # Skip validity flag columns
+                non_null = self.df[col].notna().mean() * 100
+                completeness_scores.append(non_null)
+        metrics['completeness'] = sum(completeness_scores) / len(completeness_scores) if completeness_scores else 0
+        
+        # Calculate consistency
+        consistency_scores = []
         for col in self.df.columns:
+            if col.endswith('_is_valid'):
+                continue
+                
             try:
                 if col in self.date_columns:
-                    # Check if dates are in a consistent format
-                    dates = pd.to_datetime(self.df[col], errors='coerce')
-                    metrics['consistency'][col] = (dates.notna().mean()) * 100
+                    # Use validity flags for date columns
+                    valid_flag = f"{col}_is_valid"
+                    if valid_flag in self.df.columns:
+                        consistency_scores.append(self.df[valid_flag].mean() * 100)
+                
                 elif col in self.text_columns:
-                    # Check if text values follow expected patterns
-                    non_empty = self.df[col].fillna('').astype(str).str.strip().str.len() > 0
-                    metrics['consistency'][col] = (non_empty.mean()) * 100
+                    # Check for consistent text patterns
+                    values = self.df[col].fillna('').astype(str)
+                    avg_length = values.str.len().mean()
+                    std_length = values.str.len().std()
+                    consistency_score = 100 * (1 - (std_length / avg_length if avg_length > 0 else 1))
+                    consistency_scores.append(max(0, min(100, consistency_score)))
+                
                 else:
-                    # For other columns, check for non-null values
-                    metrics['consistency'][col] = (self.df[col].notna().mean()) * 100
+                    # For other columns, check value distribution
+                    value_counts = self.df[col].value_counts(normalize=True)
+                    if not value_counts.empty:
+                        entropy = -(value_counts * np.log(value_counts)).sum()
+                        consistency_score = 100 * (1 - min(1, entropy / 4))  # Normalize entropy
+                        consistency_scores.append(consistency_score)
+            
             except Exception as e:
                 print(f"Warning: Could not check consistency for {col}: {str(e)}")
-                metrics['consistency'][col] = 0
-
-        # Calculate validity for each column
+        
+        metrics['consistency'] = sum(consistency_scores) / len(consistency_scores) if consistency_scores else 0
+        
+        # Calculate validity
+        validity_scores = []
         for col in self.df.columns:
+            if col.endswith('_is_valid'):
+                continue
+                
             try:
                 if col in self.date_columns:
-                    # Check if dates are valid and not in the future
-                    dates = pd.to_datetime(self.df[col], errors='coerce')
-                    valid_dates = dates.notna() & (dates <= pd.Timestamp.now())
-                    metrics['validity'][col] = (valid_dates.mean()) * 100
+                    # Use validity flags for dates
+                    valid_flag = f"{col}_is_valid"
+                    if valid_flag in self.df.columns:
+                        valid_dates = self.df[valid_flag].mean() * 100
+                        future_dates = (
+                            (self.df[col] > pd.Timestamp.now()).mean() * 100 
+                            if self.df[valid_flag].any() else 0
+                        )
+                        validity_scores.append(valid_dates * (1 - future_dates/100))
+                
                 elif col == 'course_no':
-                    # Check if course numbers follow the expected format
+                    # Validate course numbers
                     valid_format = self.df[col].apply(
                         lambda x: bool(re.match(r'^[A-Za-z0-9-]+$', str(x))) if pd.notna(x) else False
                     )
-                    metrics['validity'][col] = (valid_format.mean()) * 100
+                    validity_scores.append(valid_format.mean() * 100)
+                
                 elif col in self.text_columns:
-                    # Check if text values are within reasonable length
-                    valid_length = self.df[col].fillna('').astype(str).str.len().between(1, 5000)
-                    metrics['validity'][col] = (valid_length.mean()) * 100
+                    # Check for reasonable text content
+                    values = self.df[col].fillna('').astype(str)
+                    valid_length = values.str.len().between(1, 5000).mean() * 100
+                    validity_scores.append(valid_length)
+                
                 else:
-                    # For other columns, check for non-null and non-empty values
-                    valid_values = self.df[col].notna() & (self.df[col].astype(str).str.strip() != '')
-                    metrics['validity'][col] = (valid_values.mean()) * 100
+                    # Basic validity check for other columns
+                    valid_values = (
+                        self.df[col].notna() & 
+                        (self.df[col].astype(str).str.strip() != '')
+                    ).mean() * 100
+                    validity_scores.append(valid_values)
+            
             except Exception as e:
                 print(f"Warning: Could not check validity for {col}: {str(e)}")
-                metrics['validity'][col] = 0
-
+        
+        metrics['validity'] = sum(validity_scores) / len(validity_scores) if validity_scores else 0
+        
         return metrics
 
     def get_missing_data_summary(self):
@@ -248,24 +300,258 @@ class LMSContentAnalyzer:
     def get_category_distribution(self):
         """Get training distribution by broad categories"""
         if 'category_name' not in self.df.columns:
-            # Create mock category distribution data
-            return pd.DataFrame({
-                'category_type': ['Leadership Development', 'Leadership Development', 'Managerial and Supervisory', 
-                                'Mandatory and Compliance', 'Technical Skills'] * 2,
-                'subcategory': ['Executive Leadership', 'Team Leadership', 'New Manager Training',
-                               'Annual Compliance', 'Technical Skills', 'Professional Skills',
-                               'Leadership Skills', 'Management Skills', 'Supervisory Skills',
-                               'Safety Training'],
-                'count': [100, 80, 120, 200, 150, 90, 70, 110, 95, 180]
-            })
+            st.warning("⚠️ No explicit category data found. Would you like to infer categories from course titles and descriptions?")
+            use_inference = st.checkbox("Use AI to infer categories", value=False)
             
-        # Create a copy to avoid SettingWithCopyWarning
+            if not use_inference:
+                st.info("Please add category data to your Excel file for category analysis.")
+                return None
+            
+            # If user opts for inference
+            confidence_threshold = st.slider(
+                "Minimum confidence threshold for category inference",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.7,
+                help="Only include categories inferred with confidence above this threshold"
+            )
+            
+            # Create a copy to avoid SettingWithCopyWarning
+            df_copy = self.df.copy()
+            df_copy['category_type'], df_copy['inference_confidence'] = zip(
+                *df_copy.apply(lambda x: self._infer_category_with_confidence(x, confidence_threshold), axis=1)
+            )
+            
+            # Only include high-confidence predictions
+            df_copy = df_copy[df_copy['inference_confidence'] >= confidence_threshold]
+            
+            if len(df_copy) == 0:
+                st.warning("No categories could be inferred with sufficient confidence.")
+                return None
+            
+            category_counts = df_copy.groupby(['category_type']).agg({
+                'course_title': 'count',
+                'inference_confidence': 'mean'
+            }).reset_index()
+            
+            category_counts.columns = ['category_type', 'count', 'avg_confidence']
+            return category_counts
+            
+        # If we have actual category data
         df_copy = self.df.copy()
         df_copy['category_type'] = df_copy['category_name'].apply(self._categorize_course)
         
         category_counts = df_copy.groupby(['category_type', 'category_name']).size().reset_index()
         category_counts.columns = ['category_type', 'subcategory', 'count']
         return category_counts
+
+    def _infer_category_with_confidence(self, row, confidence_threshold=0.7):
+        """Infer category with confidence score using course metadata"""
+        title = str(row['course_title']).lower() if pd.notna(row.get('course_title')) else ''
+        desc = str(row['course_description']).lower() if pd.notna(row.get('course_description')) else ''
+        
+        # Define category keywords with weights
+        category_keywords = {
+            'Leadership Development': {
+                'keywords': ['leadership', 'executive', 'management', 'strategy'],
+                'weights': [1.0, 0.9, 0.8, 0.7]
+            },
+            'Technical Skills': {
+                'keywords': ['technical', 'software', 'programming', 'data'],
+                'weights': [1.0, 0.9, 0.8, 0.7]
+            },
+            'Compliance': {
+                'keywords': ['compliance', 'regulatory', 'legal', 'policy'],
+                'weights': [1.0, 0.9, 0.8, 0.7]
+            }
+        }
+        
+        # Calculate confidence scores for each category
+        text = f"{title} {desc}"
+        scores = {}
+        
+        for category, data in category_keywords.items():
+            score = 0
+            for keyword, weight in zip(data['keywords'], data['weights']):
+                if keyword in text:
+                    score += weight
+            scores[category] = score / len(data['keywords'])
+        
+        # Get category with highest confidence
+        if scores:
+            best_category = max(scores.items(), key=lambda x: x[1])
+            return best_category if best_category[1] >= confidence_threshold else ('Uncategorized', 0.0)
+        
+        return ('Uncategorized', 0.0)
+
+    def get_content_gaps(self):
+        """Analyze content gaps across different dimensions"""
+        gaps = {
+            'category_gaps': [],
+            'skill_gaps': [],
+            'audience_gaps': [],
+            'confidence_scores': {}
+        }
+        
+        # Category coverage analysis
+        if 'category_name' in self.df.columns:
+            category_counts = self.df['category_name'].value_counts()
+            avg_count = category_counts.mean()
+            gaps['category_gaps'] = [
+                {
+                    'category': cat,
+                    'current_count': count,
+                    'gap_percentage': ((avg_count - count) / avg_count) * 100,
+                    'is_inferred': False
+                }
+                for cat, count in category_counts.items()
+                if count < avg_count * 0.5
+            ]
+        else:
+            st.warning("⚠️ No explicit category data available for gap analysis")
+        
+        # Skill coverage analysis (using NLP on descriptions)
+        if 'course_description' in self.df.columns:
+            skill_threshold = st.slider(
+                "Skill extraction confidence threshold",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.6,
+                help="Minimum confidence for skill extraction"
+            )
+            
+            skills_data = self._extract_skills_with_confidence(skill_threshold)
+            if skills_data:
+                gaps['skill_gaps'] = skills_data['gaps']
+                gaps['confidence_scores']['skills'] = skills_data['confidence']
+        
+        return gaps
+
+    def _extract_skills_with_confidence(self, confidence_threshold=0.6):
+        """Extract skills from course descriptions with confidence scores"""
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.cluster import DBSCAN
+            
+            # Prepare text data
+            descriptions = self.df['course_description'].fillna('').astype(str)
+            
+            # Extract potential skill phrases
+            vectorizer = TfidfVectorizer(
+                ngram_range=(1, 3),
+                stop_words='english',
+                max_features=1000
+            )
+            tfidf_matrix = vectorizer.fit_transform(descriptions)
+            
+            # Cluster similar skills
+            clustering = DBSCAN(eps=0.3, min_samples=3)
+            clusters = clustering.fit_predict(tfidf_matrix)
+            
+            # Calculate confidence scores based on cluster density
+            unique_clusters = set(clusters)
+            skill_clusters = {}
+            confidence_scores = {}
+            
+            for cluster_id in unique_clusters:
+                if cluster_id != -1:  # Ignore noise points
+                    cluster_docs = descriptions[clusters == cluster_id]
+                    top_terms = vectorizer.get_feature_names_out()
+                    
+                    # Calculate term importance in cluster
+                    cluster_tfidf = tfidf_matrix[clusters == cluster_id].mean(axis=0).A1
+                    top_indices = cluster_tfidf.argsort()[-5:][::-1]  # Top 5 terms
+                    
+                    for idx in top_indices:
+                        term = top_terms[idx]
+                        confidence = float(cluster_tfidf[idx])
+                        if confidence >= confidence_threshold:
+                            skill_clusters[term] = len(cluster_docs)
+                            confidence_scores[term] = confidence
+            
+            # Identify gaps based on skill distribution
+            avg_skill_count = np.mean(list(skill_clusters.values()))
+            gaps = [
+                {
+                    'skill': skill,
+                    'current_count': count,
+                    'confidence': confidence_scores[skill],
+                    'gap_percentage': ((avg_skill_count - count) / avg_skill_count) * 100
+                }
+                for skill, count in skill_clusters.items()
+                if count < avg_skill_count * 0.5
+            ]
+            
+            return {
+                'gaps': sorted(gaps, key=lambda x: x['gap_percentage'], reverse=True),
+                'confidence': confidence_scores
+            }
+            
+        except Exception as e:
+            st.error(f"Error in skill extraction: {str(e)}")
+            return None
+
+    def analyze_content_quality(self):
+        """Analyze content quality with transparency about metrics"""
+        quality_metrics = {
+            'metrics': {},
+            'confidence': {},
+            'recommendations': []
+        }
+        
+        # Completeness analysis
+        completeness = {}
+        for col in self.df.columns:
+            non_null = self.df[col].notna().mean() * 100
+            completeness[col] = {
+                'score': non_null,
+                'is_inferred': False
+            }
+        quality_metrics['metrics']['completeness'] = completeness
+        
+        # Content richness analysis
+        if 'course_description' in self.df.columns:
+            desc_lengths = self.df['course_description'].fillna('').str.len()
+            quality_metrics['metrics']['content_richness'] = {
+                'avg_description_length': desc_lengths.mean(),
+                'short_descriptions': (desc_lengths < 100).sum(),
+                'is_inferred': False
+            }
+        
+        # Metadata quality
+        metadata_scores = {}
+        for col in self.df.columns:
+            if col in self.text_columns:
+                valid_values = self._validate_text_field(col)
+                metadata_scores[col] = {
+                    'score': valid_values['score'],
+                    'is_inferred': valid_values['is_inferred'],
+                    'confidence': valid_values.get('confidence', 1.0)
+                }
+        quality_metrics['metrics']['metadata_quality'] = metadata_scores
+        
+        return quality_metrics
+
+    def _validate_text_field(self, column):
+        """Validate text field quality with confidence scores"""
+        if column not in self.df.columns:
+            return {'score': 0, 'is_inferred': True, 'confidence': 0}
+            
+        values = self.df[column].fillna('')
+        
+        # Basic validation
+        non_empty = values.str.len() > 0
+        score = non_empty.mean() * 100
+        
+        # Check for potentially problematic patterns
+        problematic = values.str.contains(r'test|dummy|placeholder', case=False, regex=True)
+        score = score * (1 - problematic.mean())
+        
+        return {
+            'score': score,
+            'is_inferred': False,
+            'confidence': 1.0
+        }
 
     def get_persona_distribution(self):
         """Get training distribution by persona"""
@@ -944,11 +1230,11 @@ class LMSContentAnalyzer:
         
         try:
             # Check for significant missing data
-            missing_data = self.get_missing_data_analysis()
-            for _, row in missing_data.iterrows():
-                if row['missing_percentage'] > 5:
+            missing_data = self.get_missing_data_summary()
+            for col, stats in missing_data.items():
+                if stats['percentage'] > 5:
                     issues['Missing Data'].append(
-                        f"{row['column']}: {row['missing_percentage']:.1f}% missing values"
+                        f"{col}: {stats['percentage']:.1f}% missing values"
                     )
             
             # Check for inconsistent values
@@ -978,7 +1264,7 @@ class LMSContentAnalyzer:
                         f"Found {len(duplicates)} potential duplicate course titles"
                     )
         except Exception as e:
-            print(f"Warning: Error checking data quality: {str(e)}")
+            print("Warning: Error checking data quality:", str(e))  # Fixed string formatting
         
         return {k: v for k, v in issues.items() if v}  # Only return categories with issues
 
@@ -1109,6 +1395,594 @@ class LMSContentAnalyzer:
         except Exception as e:
             print(f"Warning: Validation failed for column {column}: {str(e)}")
             return pd.Series([False] * len(self.df))
+
+    def analyze_learning_effectiveness(self):
+        """Analyze learning effectiveness metrics"""
+        effectiveness = {
+            'available_metrics': {},
+            'missing_data': [],
+            'recommendations': []
+        }
+        
+        # Check completion metrics
+        if 'completion_rate' in self.df.columns:
+            completion_trends = self._calculate_completion_trends()
+            dropout_analysis = self._analyze_dropout_points()
+            if completion_trends or dropout_analysis:
+                effectiveness['available_metrics']['completion'] = {
+                    'trends': completion_trends,
+                    'dropout_analysis': dropout_analysis
+                }
+        else:
+            effectiveness['missing_data'].append({
+                'metric': 'completion_rate',
+                'impact': 'Cannot analyze course completion patterns and trends',
+                'required_fields': ['completion_rate', 'completion_date']
+            })
+        
+        # Check performance metrics
+        if 'quiz_scores' in self.df.columns:
+            skill_mastery = self._calculate_skill_mastery()
+            if skill_mastery:
+                effectiveness['available_metrics']['performance'] = {
+                    'skill_mastery': skill_mastery
+                }
+        else:
+            effectiveness['missing_data'].append({
+                'metric': 'quiz_scores',
+                'impact': 'Cannot assess learning performance and skill mastery',
+                'required_fields': ['quiz_scores', 'assessment_results']
+            })
+        
+        # Check skill progression
+        if all(col in self.df.columns for col in ['pre_assessment', 'post_assessment']):
+            skill_gaps = self._analyze_skill_gaps_closed()
+            retention = self._analyze_retention_rates()
+            if skill_gaps or retention:
+                effectiveness['available_metrics']['skill_progression'] = {
+                    'skill_gaps_closed': skill_gaps,
+                    'retention_rates': retention
+                }
+        else:
+            effectiveness['missing_data'].append({
+                'metric': 'skill_progression',
+                'impact': 'Cannot measure skill improvement and knowledge retention',
+                'required_fields': ['pre_assessment', 'post_assessment', 'retention_score']
+            })
+        
+        # Generate recommendations for data collection
+        if effectiveness['missing_data']:
+            effectiveness['recommendations'].extend([
+                'Implement systematic tracking of completion rates and dates',
+                'Add pre and post assessments to measure skill progression',
+                'Track quiz scores and assessment results',
+                'Monitor knowledge retention through follow-up assessments'
+            ])
+        
+        return effectiveness
+
+    def analyze_engagement_patterns(self):
+        """Analyze learner engagement patterns"""
+        patterns = {
+            'available_metrics': {},
+            'missing_data': [],
+            'recommendations': []
+        }
+        
+        # Check engagement metrics
+        if 'session_duration' in self.df.columns:
+            engagement_dist = self._calculate_engagement_distribution()
+            if engagement_dist:
+                patterns['available_metrics']['engagement_levels'] = engagement_dist
+        else:
+            patterns['missing_data'].append({
+                'metric': 'session_duration',
+                'impact': 'Cannot analyze time spent on learning activities',
+                'required_fields': ['session_duration']
+            })
+        
+        # Check interaction data
+        if 'interaction_type' in self.df.columns:
+            interactions = self._analyze_interaction_types()
+            if interactions:
+                patterns['available_metrics']['interaction_analysis'] = interactions
+        else:
+            patterns['missing_data'].append({
+                'metric': 'interaction_types',
+                'impact': 'Cannot analyze how learners interact with content',
+                'required_fields': ['interaction_type', 'interaction_count']
+            })
+        
+        # Check engagement quality
+        required_fields = ['interaction_count', 'session_duration']
+        if all(col in self.df.columns for col in required_fields):
+            quality = self._calculate_engagement_quality()
+            if quality:
+                patterns['available_metrics']['engagement_quality'] = quality
+        else:
+            patterns['missing_data'].append({
+                'metric': 'engagement_quality',
+                'impact': 'Cannot assess the quality and depth of engagement',
+                'required_fields': required_fields
+            })
+        
+        # Generate recommendations for data collection
+        if patterns['missing_data']:
+            patterns['recommendations'].extend([
+                'Track session duration for all learning activities',
+                'Implement interaction tracking to understand engagement patterns',
+                'Monitor both quantity and quality of learner interactions',
+                'Consider adding engagement metrics to your LMS'
+            ])
+        
+        return patterns
+
+    def generate_personalized_recommendations(self, user_data=None):
+        """Generate personalized learning recommendations"""
+        recommendations = {
+            'based_on_history': [],
+            'based_on_skills': [],
+            'based_on_role': [],
+            'next_steps': []
+        }
+        
+        if user_data is None:
+            # Generate generic recommendations based on overall patterns
+            popular_courses = (
+                self.df.sort_values('completion_rate', ascending=False)
+                ['course_title']
+                .head(5)
+                .tolist()
+            )
+            recommendations['based_on_history'] = popular_courses
+            
+            if 'category_name' in self.df.columns:
+                trending_categories = (
+                    self.df.groupby('category_name')
+                    .size()
+                    .sort_values(ascending=False)
+                    .head(3)
+                    .index
+                    .tolist()
+                )
+                recommendations['based_on_role'] = trending_categories
+        else:
+            # Generate personalized recommendations based on user data
+            if 'completed_courses' in user_data:
+                # Find similar courses based on completed ones
+                similar_courses = []
+                for course in user_data['completed_courses']:
+                    if course in self.df['course_title'].values:
+                        course_idx = self.df[self.df['course_title'] == course].index[0]
+                        similar_indices = (
+                            self.df[self.df['category_name'] == self.df.loc[course_idx, 'category_name']]
+                            .index
+                            .tolist()
+                        )
+                        similar_courses.extend(
+                            self.df.loc[similar_indices, 'course_title']
+                            .tolist()
+                        )
+                recommendations['based_on_history'] = list(set(similar_courses))[:5]
+            
+            if 'skills' in user_data:
+                # Recommend courses based on user's skills
+                skill_based = []
+                for skill in user_data['skills']:
+                    relevant_courses = (
+                        self.df[self.df['skills_covered'].str.contains(skill, na=False)]
+                        ['course_title']
+                        .tolist()
+                    )
+                    skill_based.extend(relevant_courses)
+                recommendations['based_on_skills'] = list(set(skill_based))[:5]
+            
+            if 'role' in user_data:
+                # Recommend courses based on user's role
+                role_based = (
+                    self.df[self.df['target_role'].str.contains(user_data['role'], na=False)]
+                    ['course_title']
+                    .tolist()
+                )
+                recommendations['based_on_role'] = role_based[:5]
+        
+        # Generate next steps
+        recommendations['next_steps'] = [
+            'Complete recommended courses',
+            'Update skills profile',
+            'Join relevant learning paths',
+            'Track progress regularly'
+        ]
+        
+        return recommendations
+
+    def analyze_business_impact(self):
+        """Analyze business impact of learning programs"""
+        impact = {
+            'available_metrics': {},
+            'missing_data': [],
+            'recommendations': []
+        }
+        
+        # Check ROI metrics
+        required_fields = ['course_cost', 'completion_rate']
+        if all(col in self.df.columns for col in required_fields):
+            total_cost = self.df['course_cost'].sum()
+            completed_courses = self.df[self.df['completion_rate'] >= 0.8]
+            
+            impact['available_metrics']['roi'] = {
+                'total_investment': total_cost,
+                'cost_per_completion': total_cost / len(completed_courses) if len(completed_courses) > 0 else 0,
+                'completion_rate': len(completed_courses) / len(self.df) * 100
+            }
+        else:
+            impact['missing_data'].append({
+                'metric': 'roi',
+                'impact': 'Cannot calculate return on investment metrics',
+                'required_fields': required_fields
+            })
+        
+        # Check skill development impact
+        required_fields = ['pre_assessment', 'post_assessment']
+        if all(col in self.df.columns for col in required_fields):
+            skill_improvement = self.df['post_assessment'] - self.df['pre_assessment']
+            
+            impact['available_metrics']['skill_development'] = {
+                'average_improvement': skill_improvement.mean(),
+                'significant_improvements': len(skill_improvement[skill_improvement > 20]) / len(self.df) * 100,
+                'areas_of_impact': self.df.groupby('category_name')['post_assessment'].mean().to_dict()
+            }
+        else:
+            impact['missing_data'].append({
+                'metric': 'skill_development',
+                'impact': 'Cannot measure skill improvement and development impact',
+                'required_fields': required_fields
+            })
+        
+        # Check productivity impact
+        if 'productivity_score' in self.df.columns:
+            impact['available_metrics']['productivity'] = {
+                'average_improvement': self.df['productivity_score'].mean(),
+                'high_impact_courses': (
+                    self.df[self.df['productivity_score'] > self.df['productivity_score'].mean()]
+                    ['course_title']
+                    .tolist()
+                )
+            }
+        else:
+            impact['missing_data'].append({
+                'metric': 'productivity',
+                'impact': 'Cannot assess impact on workplace productivity',
+                'required_fields': ['productivity_score', 'performance_metrics']
+            })
+        
+        # Generate recommendations for data collection
+        if impact['missing_data']:
+            impact['recommendations'].extend([
+                'Track course costs and completion rates',
+                'Implement pre and post skill assessments',
+                'Measure workplace productivity impact',
+                'Monitor business performance indicators'
+            ])
+        
+        return impact
+
+    def _calculate_completion_trends(self):
+        """Calculate completion trends over time"""
+        if 'completion_date' not in self.df.columns:
+            return None
+            
+        trends = {}
+        # Group by month and calculate completion rates
+        monthly_completion = (
+            self.df.set_index('completion_date')
+            .resample('M')['completion_rate']
+            .mean()
+        )
+        
+        # Calculate trend
+        trend_coefficient = np.polyfit(
+            range(len(monthly_completion)),
+            monthly_completion.values,
+            1
+        )[0]
+        
+        trends['direction'] = 'increasing' if trend_coefficient > 0 else 'decreasing'
+        trends['monthly_rates'] = monthly_completion.to_dict()
+        trends['trend_strength'] = abs(trend_coefficient)
+        
+        return trends
+
+    def _analyze_dropout_points(self):
+        """Analyze where and why learners drop out"""
+        if 'last_completed_module' not in self.df.columns:
+            return None
+            
+        dropouts = {}
+        # Find common dropout points
+        dropout_points = (
+            self.df[self.df['completion_rate'] < 1.0]
+            ['last_completed_module']
+            .value_counts()
+            .head(5)
+            .to_dict()
+        )
+        
+        dropouts['common_points'] = dropout_points
+        
+        # Analyze patterns if reason data is available
+        if 'dropout_reason' in self.df.columns:
+            dropouts['reasons'] = (
+                self.df['dropout_reason']
+                .value_counts()
+                .head(5)
+                .to_dict()
+            )
+        
+        return dropouts
+
+    def _calculate_skill_mastery(self):
+        """Calculate skill mastery levels"""
+        if 'quiz_scores' not in self.df.columns:
+            return None
+            
+        mastery = {}
+        # Define mastery thresholds
+        mastery_levels = {
+            'Expert': 90,
+            'Proficient': 80,
+            'Competent': 70,
+            'Developing': 60
+        }
+        
+        # Calculate distribution across mastery levels
+        for level, threshold in mastery_levels.items():
+            mastery[level] = (
+                len(self.df[self.df['quiz_scores'] >= threshold]) / 
+                len(self.df) * 100
+            )
+        
+        return mastery
+
+    def _analyze_skill_gaps_closed(self):
+        """Analyze the effectiveness of skill gap closure"""
+        if 'pre_assessment' not in self.df.columns or 'post_assessment' not in self.df.columns:
+            return None
+            
+        gaps = {}
+        improvement = self.df['post_assessment'] - self.df['pre_assessment']
+        
+        gaps['fully_closed'] = len(improvement[improvement >= 20]) / len(self.df) * 100
+        gaps['partially_closed'] = len(improvement[(improvement >= 10) & (improvement < 20)]) / len(self.df) * 100
+        gaps['minimal_improvement'] = len(improvement[improvement < 10]) / len(self.df) * 100
+        
+        return gaps
+
+    def _analyze_retention_rates(self):
+        """Analyze knowledge retention over time"""
+        if 'retention_score' not in self.df.columns or 'days_since_completion' not in self.df.columns:
+            return None
+            
+        retention = {}
+        # Calculate retention rates at different intervals
+        intervals = [30, 60, 90, 180]
+        
+        for interval in intervals:
+            retention[f'{interval}_days'] = (
+                self.df[self.df['days_since_completion'] <= interval]
+                ['retention_score']
+                .mean()
+            )
+        
+        return retention
+
+    def _calculate_engagement_distribution(self):
+        """Calculate the distribution of engagement levels"""
+        if 'session_duration' not in self.df.columns:
+            return None
+            
+        engagement = {}
+        # Define engagement levels
+        duration_bins = [0, 15, 30, 60, float('inf')]
+        labels = ['Low', 'Medium', 'High', 'Very High']
+        
+        self.df['engagement_level'] = pd.cut(
+            self.df['session_duration'],
+            bins=duration_bins,
+            labels=labels
+        )
+        
+        engagement['distribution'] = (
+            self.df['engagement_level']
+            .value_counts(normalize=True)
+            .to_dict()
+        )
+        
+        return engagement
+
+    def _analyze_interaction_types(self):
+        """Analyze types of learner interactions"""
+        if 'interaction_type' not in self.df.columns:
+            return None
+            
+        interactions = {}
+        # Calculate frequency of different interaction types
+        interactions['frequency'] = (
+            self.df['interaction_type']
+            .value_counts(normalize=True)
+            .to_dict()
+        )
+        
+        # Calculate effectiveness if we have performance data
+        if 'quiz_scores' in self.df.columns:
+            interactions['effectiveness'] = (
+                self.df.groupby('interaction_type')['quiz_scores']
+                .mean()
+                .to_dict()
+            )
+        
+        return interactions
+
+    def _calculate_engagement_quality(self):
+        """Calculate the quality of learner engagement"""
+        if 'interaction_count' not in self.df.columns or 'session_duration' not in self.df.columns:
+            return None
+            
+        quality = {}
+        # Calculate engagement density (interactions per minute)
+        self.df['engagement_density'] = (
+            self.df['interaction_count'] / 
+            (self.df['session_duration'] / 60)
+        )
+        
+        quality['avg_engagement_density'] = self.df['engagement_density'].mean()
+        quality['engagement_quality_dist'] = (
+            pd.qcut(self.df['engagement_density'], q=4)
+            .value_counts(normalize=True)
+            .to_dict()
+        )
+        
+        return quality
+
+    def _analyze_sequence_effectiveness(self):
+        """Analyze the effectiveness of learning sequences"""
+        effectiveness = {
+            'completion_rates': {},
+            'performance_metrics': {},
+            'progression_speed': {},
+            'recommendations': []
+        }
+        
+        if 'course_sequence' not in self.df.columns:
+            return effectiveness
+            
+        # Analyze completion rates for different sequences
+        sequence_completion = (
+            self.df.groupby('course_sequence')['completion_rate']
+            .agg(['mean', 'count'])
+            .sort_values('mean', ascending=False)
+        )
+        
+        effectiveness['completion_rates'] = {
+            'best_sequences': sequence_completion.head(3).to_dict('index'),
+            'worst_sequences': sequence_completion.tail(3).to_dict('index')
+        }
+        
+        # Analyze performance if quiz data is available
+        if 'quiz_scores' in self.df.columns:
+            sequence_performance = (
+                self.df.groupby('course_sequence')['quiz_scores']
+                .mean()
+                .sort_values(ascending=False)
+                .head(5)
+                .to_dict()
+            )
+            effectiveness['performance_metrics'] = sequence_performance
+        
+        # Analyze progression speed if duration data is available
+        if 'completion_duration' in self.df.columns:
+            speed_by_sequence = (
+                self.df.groupby('course_sequence')['completion_duration']
+                .agg(['mean', 'median', 'std'])
+                .sort_values('mean')
+                .head(5)
+                .to_dict('index')
+            )
+            effectiveness['progression_speed'] = speed_by_sequence
+        
+        # Generate recommendations based on analysis
+        effectiveness['recommendations'] = [
+            'Follow high-performing sequences',
+            'Consider prerequisites carefully',
+            'Allow flexible pacing',
+            'Monitor sequence effectiveness'
+        ]
+        
+        return effectiveness
+
+    def analyze_learning_paths(self):
+        """Analyze and recommend learning paths"""
+        paths = {
+            'available_metrics': {},
+            'missing_data': [],
+            'recommendations': []
+        }
+        
+        # Check sequence data
+        if 'course_sequence' in self.df.columns:
+            sequence_patterns = (
+                self.df.groupby('course_sequence')
+                .size()
+                .sort_values(ascending=False)
+                .head(5)
+                .to_dict()
+            )
+            paths['available_metrics']['learning_sequences'] = {
+                'common_sequences': sequence_patterns,
+                'effectiveness': self._analyze_sequence_effectiveness()
+            }
+        else:
+            paths['missing_data'].append({
+                'metric': 'learning_sequences',
+                'impact': 'Cannot analyze common learning paths and their effectiveness',
+                'required_fields': ['course_sequence', 'completion_rate']
+            })
+        
+        # Check content relationships
+        if 'course_description' in self.df.columns:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+            
+            tfidf = TfidfVectorizer(stop_words='english')
+            tfidf_matrix = tfidf.fit_transform(self.df['course_description'].fillna(''))
+            similarity_matrix = cosine_similarity(tfidf_matrix)
+            
+            content_relationships = {}
+            for idx, row in self.df.iterrows():
+                similar_indices = similarity_matrix[idx].argsort()[-4:-1][::-1]
+                content_relationships[row['course_title']] = {
+                    'related_courses': self.df.iloc[similar_indices]['course_title'].tolist(),
+                    'similarity_scores': similarity_matrix[idx][similar_indices].tolist()
+                }
+            paths['available_metrics']['content_relationships'] = content_relationships
+        else:
+            paths['missing_data'].append({
+                'metric': 'content_relationships',
+                'impact': 'Cannot identify related courses and content connections',
+                'required_fields': ['course_description', 'course_keywords']
+            })
+        
+        # Check skill coverage
+        if 'skills_covered' in self.df.columns:
+            skill_coverage = {}
+            for skill in self.df['skills_covered'].unique():
+                relevant_courses = (
+                    self.df[self.df['skills_covered'].str.contains(skill, na=False)]
+                    .sort_values('completion_rate', ascending=False)
+                    ['course_title']
+                    .head(3)
+                    .tolist()
+                )
+                if relevant_courses:
+                    skill_coverage[skill] = relevant_courses
+            paths['available_metrics']['skill_coverage'] = skill_coverage
+        else:
+            paths['missing_data'].append({
+                'metric': 'skill_coverage',
+                'impact': 'Cannot map skills to courses and suggest skill-based paths',
+                'required_fields': ['skills_covered', 'skill_level']
+            })
+        
+        # Generate recommendations for data collection
+        if paths['missing_data']:
+            paths['recommendations'].extend([
+                'Track course sequences and completion order',
+                'Add detailed course descriptions and keywords',
+                'Map skills to courses explicitly',
+                'Track skill levels and prerequisites'
+            ])
+        
+        return paths
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
