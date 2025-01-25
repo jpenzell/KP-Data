@@ -9,6 +9,7 @@ from pathlib import Path
 
 from lms_content_analyzer import LMSContentAnalyzer
 
+# Must be the first Streamlit command
 st.set_page_config(page_title="LMS Content Analysis", layout="wide")
 
 def create_wordcloud(text):
@@ -33,203 +34,245 @@ def plot_quality_distribution(df):
                   annotation_text="Attention Threshold")
     return fig
 
+def display_missing_data_info(missing_data):
+    """Display information about missing data and its impact"""
+    st.warning("⚠️ Some analyses are limited due to missing data")
+    for item in missing_data:
+        with st.expander(f"Impact: {item['impact']}"):
+            st.write("Required fields:")
+            for field in item['required_fields']:
+                st.write(f"- {field}")
+
 def main():
     st.title("LMS Content Analysis Dashboard")
     
-    # File uploader
     uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
     
     if uploaded_file is not None:
         try:
             analyzer = LMSContentAnalyzer(uploaded_file)
             
-            # Create tabs
+            # Create tabs for different analyses
             tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "Data Quality",
-                "Training Categories",
-                "Delivery & Usage",
-                "Content Production",
-                "Financial Analysis"
+                "Data Quality Overview",
+                "Learning Effectiveness",
+                "Engagement Analysis",
+                "Learning Paths",
+                "Business Impact"
             ])
             
             with tab1:
                 st.header("Data Quality Overview")
-                
-                # Get metrics
                 quality_metrics = analyzer.get_data_quality_metrics()
-                missing_data = analyzer.get_missing_data_summary()
-                value_distributions = analyzer.get_value_distributions()
-                date_ranges = analyzer.get_date_ranges()
-                text_stats = analyzer.get_text_field_stats()
-                recommendations = analyzer.get_recommendations()
                 
-                # Display metrics
-                col1, col2, col3 = st.columns(3)
+                # Display quality scores
+                if quality_metrics.get('completeness'):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Completeness Score", f"{quality_metrics['completeness']:.1f}%")
+                    with col2:
+                        st.metric("Consistency Score", f"{quality_metrics['consistency']:.1f}%")
+                    with col3:
+                        st.metric("Validity Score", f"{quality_metrics['validity']:.1f}%")
                 
-                with col1:
-                    st.subheader("Completeness")
-                    completeness_df = pd.DataFrame.from_dict(quality_metrics['completeness'], orient='index', columns=['Score'])
-                    st.dataframe(completeness_df.style.format("{:.1f}%"))
-                
-                with col2:
-                    st.subheader("Consistency")
-                    consistency_df = pd.DataFrame.from_dict(quality_metrics['consistency'], orient='index', columns=['Score'])
-                    st.dataframe(consistency_df.style.format("{:.1f}%"))
-                
-                with col3:
-                    st.subheader("Validity")
-                    validity_df = pd.DataFrame.from_dict(quality_metrics['validity'], orient='index', columns=['Score'])
-                    st.dataframe(validity_df.style.format("{:.1f}%"))
-                
-                # Display recommendations
-                st.subheader("Recommendations")
-                for rec in recommendations:
-                    st.warning(rec)
-                
-                # Display detailed stats
-                with st.expander("View Detailed Statistics"):
-                    st.subheader("Missing Data Summary")
-                    missing_df = pd.DataFrame.from_dict(missing_data, orient='index')
-                    st.dataframe(missing_df.style.format({
-                        'count': '{:,.0f}',
-                        'percentage': '{:.1f}%'
-                    }))
-                    
-                    st.subheader("Value Distributions")
-                    for col, dist in value_distributions.items():
-                        st.write(f"\n**{col}**")
-                        dist_df = pd.DataFrame.from_dict(dist, orient='index', columns=['Count'])
-                        st.dataframe(dist_df)
-                    
-                    st.subheader("Date Ranges")
-                    for col, ranges in date_ranges.items():
-                        st.write(f"\n**{col}**")
-                        st.write(f"Min: {ranges['min']}")
-                        st.write(f"Max: {ranges['max']}")
-                    
-                    st.subheader("Text Field Statistics")
-                    for col, stats in text_stats.items():
-                        st.write(f"\n**{col}**")
-                        st.write(f"Min length: {stats['min_length']:.0f}")
-                        st.write(f"Max length: {stats['max_length']:.0f}")
-                        st.write(f"Average length: {stats['avg_length']:.1f}")
+                # Display data quality issues
+                issues = analyzer.get_data_quality_issues()
+                if issues:
+                    st.subheader("Data Quality Issues")
+                    for category, items in issues.items():
+                        with st.expander(category):
+                            for item in items:
+                                st.write(f"- {item}")
             
             with tab2:
-                st.header("Training Categories Analysis")
+                st.header("Learning Effectiveness")
+                effectiveness = analyzer.analyze_learning_effectiveness()
                 
-                # Training Split by Categories
-                st.subheader("Training Split by Categories")
-                category_data = analyzer.get_category_distribution()
-                fig = px.treemap(category_data, 
-                               path=['category_type', 'subcategory'],
-                               values='count',
-                               title='Training Distribution by Category')
-                st.plotly_chart(fig)
+                if effectiveness['missing_data']:
+                    display_missing_data_info(effectiveness['missing_data'])
                 
-                # Training Focus by Persona
-                st.subheader("Training Focus by Persona")
-                col1, col2 = st.columns(2)
-                with col1:
-                    persona_data = analyzer.get_persona_distribution()
-                    fig = px.pie(persona_data, 
-                               values='percentage',
-                               names='persona',
-                               title='Training Split by Persona')
-                    st.plotly_chart(fig)
+                if effectiveness.get('available_metrics'):
+                    metrics = effectiveness['available_metrics']
+                    
+                    # Display completion metrics
+                    if 'completion' in metrics:
+                        st.subheader("Completion Analysis")
+                        completion = metrics['completion']
+                        
+                        if 'trends' in completion:
+                            st.write("Completion Trends")
+                            st.write(completion['trends'])
+                        
+                        if 'dropout_analysis' in completion:
+                            with st.expander("View Dropout Analysis"):
+                                st.write(completion['dropout_analysis'])
+                    
+                    # Display performance metrics
+                    if 'performance' in metrics:
+                        st.subheader("Performance Analysis")
+                        performance = metrics['performance']
+                        
+                        if 'skill_mastery' in performance:
+                            st.write("Skill Mastery Levels")
+                            st.write(performance['skill_mastery'])
+                    
+                    # Display skill progression
+                    if 'skill_progression' in metrics:
+                        st.subheader("Skill Development")
+                        progression = metrics['skill_progression']
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if 'skill_gaps_closed' in progression:
+                                st.write("Skill Gaps Closed")
+                                st.write(progression['skill_gaps_closed'])
+                        
+                        with col2:
+                            if 'retention_rates' in progression:
+                                st.write("Knowledge Retention")
+                                st.write(progression['retention_rates'])
                 
-                # Top 10 Learner Interests
-                with col2:
-                    interests = analyzer.get_top_learner_interests()
-                    fig = px.bar(interests,
-                               x='interest',
-                               y='count',
-                               title='Most Popular Learning Areas')
-                    st.plotly_chart(fig)
+                if effectiveness.get('recommendations'):
+                    st.subheader("Recommendations")
+                    for rec in effectiveness['recommendations']:
+                        st.write(f"- {rec}")
             
             with tab3:
-                st.header("Delivery & Usage Analysis")
+                st.header("Engagement Analysis")
+                engagement = analyzer.analyze_engagement_patterns()
                 
-                # Training Delivery Split
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader("Training Delivery Methods")
-                    delivery_data = analyzer.get_delivery_split()
-                    fig = px.pie(delivery_data,
-                               values='percentage',
-                               names='method',
-                               title='Training Delivery Split')
-                    st.plotly_chart(fig)
+                if engagement['missing_data']:
+                    display_missing_data_info(engagement['missing_data'])
                 
-                # Content Usage Length
-                with col2:
-                    st.subheader("Content Usage Length")
-                    usage_data = analyzer.get_content_usage_length()
-                    fig = px.bar(usage_data,
-                               x='duration',
-                               y='percentage',
-                               title='Content Usage Duration')
-                    st.plotly_chart(fig)
+                if engagement.get('available_metrics'):
+                    metrics = engagement['available_metrics']
+                    
+                    # Display engagement levels
+                    if 'engagement_levels' in metrics:
+                        st.subheader("Engagement Distribution")
+                        st.write(metrics['engagement_levels'])
+                    
+                    # Display interaction analysis
+                    if 'interaction_analysis' in metrics:
+                        st.subheader("Interaction Patterns")
+                        with st.expander("View Interaction Analysis"):
+                            st.write(metrics['interaction_analysis'])
+                    
+                    # Display engagement quality
+                    if 'engagement_quality' in metrics:
+                        st.subheader("Engagement Quality")
+                        st.write(metrics['engagement_quality'])
+                
+                if engagement.get('recommendations'):
+                    st.subheader("Recommendations")
+                    for rec in engagement['recommendations']:
+                        st.write(f"- {rec}")
             
             with tab4:
-                st.header("Content Production Analysis")
+                st.header("Learning Paths")
+                paths = analyzer.analyze_learning_paths()
                 
-                # Content Source Distribution
-                st.subheader("Content by Source")
-                source_data = analyzer.get_content_source_distribution()
-                fig = px.pie(source_data,
-                           values='percentage',
-                           names='source',
-                           title='Content Source Distribution')
-                st.plotly_chart(fig)
+                if paths['missing_data']:
+                    display_missing_data_info(paths['missing_data'])
                 
-                # Training Volume by Organization
-                st.subheader("Training Volume by Organization")
-                org_data = analyzer.get_training_volume_by_org()
-                fig = px.bar(org_data,
-                           x='organization',
-                           y='volume',
-                           title='Training Volume by Organization')
-                st.plotly_chart(fig)
+                if paths.get('available_metrics'):
+                    metrics = paths['available_metrics']
+                    
+                    # Display learning sequences
+                    if 'learning_sequences' in metrics:
+                        st.subheader("Common Learning Paths")
+                        st.write("Course Sequences")
+                        st.write(metrics['learning_sequences']['common_sequences'])
+                        
+                        with st.expander("View Sequence Effectiveness"):
+                            st.write(metrics['learning_sequences']['effectiveness'])
+                    
+                    # Display content relationships
+                    if 'content_relationships' in metrics:
+                        st.subheader("Related Content")
+                        selected_course = st.selectbox(
+                            "Select a course to see related content:",
+                            options=list(metrics['content_relationships'].keys())
+                        )
+                        if selected_course:
+                            st.write("Related Courses:")
+                            course_data = metrics['content_relationships'][selected_course]
+                            for course, score in zip(
+                                course_data['related_courses'],
+                                course_data['similarity_scores']
+                            ):
+                                st.write(f"- {course} (Similarity: {score:.2f})")
+                    
+                    # Display skill coverage
+                    if 'skill_coverage' in metrics:
+                        st.subheader("Skill-Based Paths")
+                        selected_skill = st.selectbox(
+                            "Select a skill to see recommended courses:",
+                            options=list(metrics['skill_coverage'].keys())
+                        )
+                        if selected_skill:
+                            st.write("Recommended Courses:")
+                            for course in metrics['skill_coverage'][selected_skill]:
+                                st.write(f"- {course}")
+                
+                if paths.get('recommendations'):
+                    st.subheader("Recommendations")
+                    for rec in paths['recommendations']:
+                        st.write(f"- {rec}")
             
             with tab5:
-                st.header("Financial Analysis")
+                st.header("Business Impact")
+                impact = analyzer.analyze_business_impact()
                 
-                # Training Costs
-                st.subheader("Training Costs Analysis")
-                cost_metrics = analyzer.get_training_cost_metrics()
+                if impact['missing_data']:
+                    display_missing_data_info(impact['missing_data'])
                 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Avg Cost per Learner", f"${cost_metrics['avg_cost_per_learner']:,.2f}")
-                with col2:
-                    st.metric("Total Training Spend", f"${cost_metrics['total_training_spend']:,.2f}")
-                with col3:
-                    st.metric("Tuition Reimbursement", f"${cost_metrics['tuition_reimbursement']:,.2f}")
+                if impact.get('available_metrics'):
+                    metrics = impact['available_metrics']
+                    
+                    # Display ROI metrics
+                    if 'roi' in metrics:
+                        st.subheader("ROI Analysis")
+                        roi = metrics['roi']
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Total Investment", f"${roi['total_investment']:,.2f}")
+                        with col2:
+                            st.metric("Cost per Completion", f"${roi['cost_per_completion']:,.2f}")
+                        with col3:
+                            st.metric("Completion Rate", f"{roi['completion_rate']:.1f}%")
+                    
+                    # Display skill development impact
+                    if 'skill_development' in metrics:
+                        st.subheader("Skill Development Impact")
+                        skill_dev = metrics['skill_development']
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Average Improvement", f"{skill_dev['average_improvement']:.1f}%")
+                        with col2:
+                            st.metric("Significant Improvements", f"{skill_dev['significant_improvements']:.1f}%")
+                        
+                        with st.expander("View Impact by Area"):
+                            st.write(skill_dev['areas_of_impact'])
+                    
+                    # Display productivity impact
+                    if 'productivity' in metrics:
+                        st.subheader("Productivity Impact")
+                        prod = metrics['productivity']
+                        st.metric("Average Productivity Improvement", f"{prod['average_improvement']:.1f}%")
+                        
+                        with st.expander("View High-Impact Courses"):
+                            for course in prod['high_impact_courses']:
+                                st.write(f"- {course}")
                 
-                # Cost Breakdown
-                st.subheader("Cost Breakdown by Role")
-                cost_by_role = analyzer.get_cost_by_role()
-                fig = px.bar(cost_by_role,
-                           x='role',
-                           y='yearly_average',
-                           title='Average Yearly Training Cost by Role')
-                st.plotly_chart(fig)
-                
-                # Export Report Option
-                st.subheader("📊 Export Analysis Report")
-                if st.button("Generate Detailed Report"):
-                    report = analyzer.generate_enhanced_report()
-                    report_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    st.download_button(
-                        label="Download Analysis Report",
-                        data=report,
-                        file_name=f"lms_analysis_report_{report_time}.txt",
-                        mime="text/plain"
-                    )
-                
+                if impact.get('recommendations'):
+                    st.subheader("Recommendations")
+                    for rec in impact['recommendations']:
+                        st.write(f"- {rec}")
+        
         except Exception as e:
-            st.error(f"Error analyzing file: {str(e)}")
-            st.exception(e)
+            st.error("Error analyzing file: " + str(e))
+            st.write("Please ensure your file contains the required data and try again.")
     else:
         st.info("Please upload an Excel file to begin analysis.")
 
