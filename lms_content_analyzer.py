@@ -19,6 +19,85 @@ warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
 
+# Constants based on the tables in the image
+TRAINING_CATEGORIES = {
+    'Leadership Development': [],
+    'Managerial and Supervisory': [],
+    'Mandatory and Compliance': ['look at overlap in NEHS'],
+    'Profession-specific or Industry-specific': [],
+    'Interpersonal Skills': ['overlap between KP authored vs SkillSoft'],
+    'Processes, Procedures, and Business Practices': [],
+    'Information Technology and Systems': [],
+    'New Hire Orientation': [],
+    'Customer Service': [],
+    'Product Knowledge': [],
+    'Sales': ['not including product knowledge'],
+    'Clinical': [],
+    'Nursing': [],
+    'Pharmacy': [],
+    'Diversity': [],
+    'Safety': [],
+    'Specialized Courses': ['not using KP Learn, Sharepoint, Web-based repositories, etc.']
+}
+
+TRAINING_FOCUS_PERSONAS = {
+    'employees': 'general staff',
+    'managers': 'management level',
+    'leaders': 'leadership level',
+    'new_hires': 'onboarding',
+    'function_specific': ['pharmacy', 'clinical', 'IT']
+}
+
+TRAINING_BREADTH = {
+    'enterprise_wide': ['compliance', 'safety', 'SkillSoft'],
+    'market_function': 'role specific',
+    'specific_setting': 'context specific'
+}
+
+DELIVERY_METHODS = {
+    'instructor_led_in_person': 'classroom based',
+    'instructor_led_virtual': 'virtual live',
+    'self_paced_elearning': ['> 20 minutes'],
+    'microlearning': ['byte sized', '< 20 minutes']
+}
+
+CONTENT_USAGE_LENGTH = {
+    '1_year': 'available in last year',
+    '2_3_years': 'available 2-3 years ago',
+    'longer': 'available more than 3 years'
+}
+
+TRAINING_ORGANIZATIONS = {
+    'Enterprise Learning Design & Delivery': 'created by someone in EL',
+    'National Leadership Development': 'NLD dept',
+    'Clinical Education': 'CE dept',
+    'Market L&D teams': 'market specific',
+    'HR12 compliance': 'compliance focused',
+    'NEH&S': 'safety and environmental',
+    'TRO': 'technical',
+    'Marketing, Sales, Underwriting, HPI': 'business focused',
+    'NFS': 'specialized'
+}
+
+CONTENT_SOURCES = {
+    'in_house': 'hard to tell who created the content',
+    'coordinator_deployed': 'content deployed from elsewhere',
+    'custom_vendor': 'not always reported correctly in deployment',
+    'url_internal': 'SharePoint',
+    'url_external': ['YouTube', 'LinkedIn'],
+    'off_the_shelf': ['SkillSoft', 'RQI', 'etc']
+}
+
+MARKET_REGIONS = {
+    'NCAL': 'Northern California',
+    'SCAL': 'Southern California',
+    'CO': 'Colorado',
+    'GA': 'Georgia',
+    'Health Plan': 'Health Plan specific',
+    'MAS': 'Mid-Atlantic States',
+    'KPWA': 'Washington'
+}
+
 class LMSContentAnalyzer:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -31,12 +110,65 @@ class LMSContentAnalyzer:
     def _load_and_prepare_data(self):
         try:
             self.df = pd.read_excel(self.file_path)
+            
+            # Standardize column names based on the tables in the image
+            standard_mappings = {
+                # Table 1: Education History Tracking
+                'Completions': 'completion_count',
+                'Client Volume': 'client_percentage',
+                'Ed History Clients': 'number_of_clients',
+                
+                # Table 2: Training Categories (handled by TRAINING_CATEGORIES)
+                'Category': 'training_category',
+                
+                # Table 3: Training Focus
+                'Person Type': 'persona_type',
+                'Function': 'function_specific',
+                
+                # Table 4: Training Breadth
+                'Region Entity': 'region_entity',
+                'Market/Function': 'market_function',
+                'Setting': 'specific_setting',
+                
+                # Table 5: Training Delivery
+                'Delivery Method': 'delivery_method',
+                'Duration': 'duration_minutes',
+                
+                # Table 6: Content Usage Length
+                'Available From': 'available_from',
+                'Usage Period': 'usage_period',
+                
+                # Table 7: Training Volume
+                'Organization': 'training_organization',
+                'Volume': 'training_volume',
+                
+                # Table 8: Content Production
+                'Source': 'content_source',
+                'Development': 'development_type',
+                
+                # Table 9: Training Assignment
+                'Assignment Type': 'assignment_type',
+                'Hours': 'training_hours',
+                
+                # Table 10: Learner Interests
+                'Interest Area': 'interest_area',
+                'Interest Level': 'interest_percentage'
+            }
+            
+            # Rename columns based on standard mappings
+            self.df.rename(columns=standard_mappings, inplace=True)
+            
             self._clean_column_names()
             self._classify_columns()
             self._convert_date_columns()
+            
+            # Remove duplicate entries if any
+            if 'course_title' in self.df.columns:
+                self.df.drop_duplicates(subset=['course_title'], keep='first', inplace=True)
+            
             print(f"\nSuccessfully loaded {len(self.df)} rows of data")
         except Exception as e:
-            print("Error loading data:", str(e))  # Fixed string formatting
+            print(f"Error loading data: {str(e)}")
             raise
 
     def _clean_column_names(self):
@@ -1091,65 +1223,99 @@ class LMSContentAnalyzer:
         return insights
 
     def generate_enhanced_report(self) -> str:
-        """Generate a comprehensive analysis report with actionable insights."""
-        insights = self.get_actionable_insights()
-        
+        """Generate a comprehensive analysis report based on all tables."""
         report = []
-        report.append("=== LMS Content Library Analysis Report ===\n")
+        report.append("=== KP Learn Learning Insights Report ===\n")
         
-        # 1. Executive Summary
-        report.append("\n=== Executive Summary ===")
-        report.append(f"Total Courses: {len(self.df)}")
-        report.append(f"Average Quality Score: {self.df['quality_score'].mean():.2f}")
-        report.append(f"Courses Needing Attention: {len(self.df[self.df['needs_attention']])}")
+        # Add report description
+        report.append("This inventory has a limited focus on recently and currently active learning items")
+        report.append("in the content repository and learning catalog. It includes content developed")
+        report.append("and/or hosted by a vendor (e.g., SkillSoft), or housed in other learning")
+        report.append("infrastructure (e.g., SharePoint) but consumed by learners via KP Learn.")
+        report.append("It does not refer to any curricula which bundles and/or sequences courses.\n")
         
-        # 2. Urgent Attention Required
-        report.append("\n=== Urgent Attention Required ===")
-        for course in insights['urgent_attention_needed']:
-            report.append(f"\nCourse: {course['course_title']}")
-            report.append(f"Quality Score: {course['quality_score']:.2f}")
-            report.append("Issues:")
-            for issue in course['issues']:
-                report.append(f"- Missing {issue.replace('_complete', '')}")
+        # Table 1: Education History Tracking
+        report.append("\n=== Education History Tracking ===")
+        history = self.analyze_education_history()
+        if history['completion_tracking']:
+            report.append(f"High Volume Completions (5k+): {history['completion_tracking']['high_volume_count']}")
+            report.append(f"Total Completions: {history['completion_tracking']['total_completions']}")
+        if history['client_volume']:
+            report.append(f"High Volume Clients (>5%): {history['client_volume']['high_volume_clients']}")
+        report.append(f"Total Ed History Clients: {history['ed_history_clients']}")
         
-        # 3. Content Gaps
-        report.append("\n=== Content Gaps ===")
-        for gap in insights['content_gaps']:
-            report.append(f"\nCategory: {gap['category']}")
-            report.append(f"Current Count: {gap['current_count']}")
-            report.append(f"Gap Percentage: {gap['gap_percentage']:.1f}%")
+        # Table 2: Training Categories
+        report.append("\n=== Training Split by Broad Categories ===")
+        categories = self.analyze_training_categories()
+        for category, data in categories.items():
+            if data['count'] > 0:
+                report.append(f"{category}: {data['percentage']:.1f}%")
         
-        # 4. Quality Improvement Opportunities
-        report.append("\n=== Quality Improvement Opportunities ===")
-        for course in insights['quality_improvements']:
-            report.append(f"\nCourse: {course['course_title']}")
-            report.append("Improvement Areas:")
-            for area, score in course['improvement_areas'].items():
-                if score < 0.6:
-                    report.append(f"- {area.title()}: {score:.2f}")
+        # Table 3: Training Focus
+        report.append("\n=== Training Focus Split by Persona ===")
+        focus = self.analyze_training_focus()
+        for persona, data in focus['persona_distribution'].items():
+            report.append(f"{persona}: {data['percentage']:.1f}%")
+        report.append("\nFunction-Specific Training:")
+        for func, data in focus['function_specific'].items():
+            report.append(f"{func}: {data['percentage']:.1f}%")
         
-        # 5. Content Redundancies
-        report.append("\n=== Potential Content Redundancies ===")
-        for redundancy in insights['content_redundancies']:
-            report.append(f"\nCourse: {redundancy['course']}")
-            report.append("Similar to:")
-            for similar in redundancy['similar_courses']:
-                report.append(f"- {similar['title']} (Similarity: {similar['similarity_score']:.2f})")
+        # Table 4: Training Breadth
+        report.append("\n=== Training Breadth and Equity ===")
+        breadth = self.analyze_training_breadth()
+        report.append(f"Enterprise-wide: {breadth['enterprise_wide'].get('percentage', 0):.1f}%")
+        report.append("\nMarket/Function Distribution:")
+        for func, data in breadth['market_function'].items():
+            report.append(f"{func}: {data['percentage']:.1f}%")
         
-        # 6. Category Distribution
-        report.append("\n=== Category Distribution Analysis ===")
-        for category in insights['category_distribution']:
-            report.append(f"\nCategory: {category['category']}")
-            report.append(f"Count: {category['count']}")
-            report.append(f"Percentage: {category['percentage']:.1f}%")
-            report.append(f"Trend: {category['trend']}")
+        # Table 5: Training Delivery
+        report.append("\n=== Training Delivery Split ===")
+        delivery = self.analyze_delivery_methods()
+        for method, data in delivery.items():
+            if method != 'duration_analysis':
+                report.append(f"{method}: {data['percentage']:.1f}%")
+        if 'duration_analysis' in delivery:
+            report.append(f"\nMicrolearning (<20 mins): {delivery['duration_analysis']['microlearning']}")
+            report.append(f"Standard (>20 mins): {delivery['duration_analysis']['standard']}")
         
-        # 7. Temporal Insights
-        report.append("\n=== Content Velocity and Aging ===")
-        temporal = insights['temporal_insights']
-        report.append(f"New content in last 6 months: {temporal['content_velocity']}")
-        report.append(f"Average monthly new content: {temporal['average_monthly_new_content']:.1f}")
-        report.append(f"Oldest content age: {temporal['oldest_content_age']:.1f} years")
+        # Table 6: Content Usage Length
+        report.append("\n=== Content Usage Length ===")
+        usage = self.analyze_content_usage()
+        for period, data in usage.items():
+            report.append(f"{data['description']}: {data['percentage']:.1f}%")
+        
+        # Table 7: Training Volume
+        report.append("\n=== Training Volume by Organization ===")
+        volume = self.analyze_training_volume()
+        for org, data in volume.items():
+            report.append(f"{org}: {data['percentage']:.1f}%")
+        
+        # Table 8: Content Production
+        report.append("\n=== Content Production and Sourcing ===")
+        production = self.analyze_content_production()
+        for source, data in production.items():
+            report.append(f"{source}: {data['percentage']:.1f}%")
+        
+        # Table 9: Training Assignment
+        report.append("\n=== Proactive vs Required Training ===")
+        assignment = self.analyze_training_assignment()
+        report.append(f"Self-assigned: {assignment['self_assigned']['percentage']:.1f}%")
+        report.append(f"Assigned/Registered: {assignment['assigned']['percentage']:.1f}%")
+        if assignment['hours_by_group']:
+            report.append("\nHours by Group:")
+            for group, hours in assignment['hours_by_group'].items():
+                report.append(f"{group}: {hours:.1f} hours")
+        
+        # Table 10: Learner Interests
+        report.append("\n=== Top 10 Learner Interests ===")
+        interests = self.analyze_learner_interests()
+        for interest in interests['top_interests']:
+            report.append(f"{interest['area']}: {interest['percentage']:.1f}%")
+        
+        if interests['trending_topics']:
+            report.append("\nTrending Topics:")
+            for topic in interests['trending_topics']:
+                report.append(f"{topic['area']}: {topic['percentage']:.1f}%")
         
         return "\n".join(report)
 
@@ -1983,6 +2149,322 @@ class LMSContentAnalyzer:
             ])
         
         return paths
+
+    def analyze_education_history(self):
+        """
+        Analyze education history tracking (Table 1)
+        Tracks completions without enrollments and finds heavy volume clients
+        """
+        history = {
+            'completion_tracking': {},
+            'client_volume': {},
+            'ed_history_clients': 0
+        }
+        
+        if 'completion_count' in self.df.columns:
+            # Get 5k+ completions
+            high_volume = self.df[self.df['completion_count'] >= 5000]
+            history['completion_tracking'] = {
+                'high_volume_count': len(high_volume),
+                'total_completions': self.df['completion_count'].sum()
+            }
+            
+            # Analyze client volume
+            if 'client_percentage' in self.df.columns:
+                history['client_volume'] = {
+                    'high_volume_clients': len(self.df[self.df['client_percentage'] > 5]),
+                    'volume_distribution': self.df['client_percentage'].describe().to_dict()
+                }
+            
+            # Count education history clients
+            if 'number_of_clients' in self.df.columns:
+                history['ed_history_clients'] = self.df['number_of_clients'].sum()
+        
+        return history
+
+    def analyze_training_categories(self):
+        """
+        Analyze training split by broad categories (Table 2)
+        """
+        categories = {cat: {'count': 0, 'percentage': 0} for cat in TRAINING_CATEGORIES.keys()}
+        
+        if 'training_category' in self.df.columns:
+            # Count courses in each category
+            category_counts = self.df['training_category'].value_counts()
+            total_courses = len(self.df)
+            
+            for cat in TRAINING_CATEGORIES.keys():
+                count = category_counts.get(cat, 0)
+                categories[cat] = {
+                    'count': count,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+        
+        return categories
+
+    def analyze_training_focus(self):
+        """
+        Analyze training focus split by persona (Table 3)
+        """
+        focus = {
+            'persona_distribution': {},
+            'function_specific': {}
+        }
+        
+        if 'persona_type' in self.df.columns:
+            # Calculate percentage for each persona
+            persona_counts = self.df['persona_type'].value_counts()
+            total_courses = len(self.df)
+            
+            for persona, description in TRAINING_FOCUS_PERSONAS.items():
+                count = persona_counts.get(persona, 0)
+                focus['persona_distribution'][persona] = {
+                    'description': description,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+            
+            # Analyze function-specific training
+            if 'function_specific' in self.df.columns:
+                function_counts = self.df['function_specific'].value_counts()
+                for func, count in function_counts.items():
+                    focus['function_specific'][func] = {
+                        'count': count,
+                        'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                    }
+        
+        return focus
+
+    def analyze_training_breadth(self):
+        """
+        Analyze training breadth and equity (Table 4)
+        """
+        breadth = {
+            'enterprise_wide': {},
+            'market_function': {},
+            'specific_setting': {}
+        }
+        
+        if 'region_entity' in self.df.columns:
+            total_courses = len(self.df)
+            
+            # Analyze enterprise-wide availability
+            enterprise_courses = self.df[
+                self.df['training_category'].isin(['Compliance', 'Safety']) |
+                self.df['content_source'].str.contains('SkillSoft', na=False)
+            ]
+            breadth['enterprise_wide'] = {
+                'count': len(enterprise_courses),
+                'percentage': (len(enterprise_courses) / total_courses * 100) if total_courses > 0 else 0
+            }
+            
+            # Analyze market/function distribution
+            if 'market_function' in self.df.columns:
+                market_counts = self.df['market_function'].value_counts()
+                breadth['market_function'] = {
+                    func: {
+                        'count': count,
+                        'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                    }
+                    for func, count in market_counts.items()
+                }
+            
+            # Analyze specific settings
+            if 'specific_setting' in self.df.columns:
+                setting_counts = self.df['specific_setting'].value_counts()
+                breadth['specific_setting'] = {
+                    setting: {
+                        'count': count,
+                        'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                    }
+                    for setting, count in setting_counts.items()
+                }
+        
+        return breadth
+
+    def analyze_delivery_methods(self):
+        """
+        Analyze training delivery split (Table 5)
+        """
+        delivery = {method: {'count': 0, 'percentage': 0} for method in DELIVERY_METHODS.keys()}
+        
+        if 'delivery_method' in self.df.columns:
+            # Calculate distribution of delivery methods
+            delivery_counts = self.df['delivery_method'].value_counts()
+            total_courses = len(self.df)
+            
+            for method, description in DELIVERY_METHODS.items():
+                count = delivery_counts.get(method, 0)
+                delivery[method] = {
+                    'description': description,
+                    'count': count,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+            
+            # Analyze duration distribution
+            if 'duration_minutes' in self.df.columns:
+                delivery['duration_analysis'] = {
+                    'microlearning': len(self.df[self.df['duration_minutes'] < 20]),
+                    'standard': len(self.df[self.df['duration_minutes'] >= 20])
+                }
+        
+        return delivery
+
+    def analyze_content_usage(self):
+        """
+        Analyze content usage length (Table 6)
+        """
+        usage = {period: {'count': 0, 'percentage': 0} for period in CONTENT_USAGE_LENGTH.keys()}
+        
+        if 'available_from' in self.df.columns:
+            current_date = pd.Timestamp.now()
+            
+            # Calculate age of each course
+            self.df['content_age'] = (current_date - pd.to_datetime(self.df['available_from'])).dt.days / 365
+            
+            # Categorize content by age
+            year_counts = {
+                '1_year': len(self.df[self.df['content_age'] <= 1]),
+                '2_3_years': len(self.df[(self.df['content_age'] > 1) & (self.df['content_age'] <= 3)]),
+                'longer': len(self.df[self.df['content_age'] > 3])
+            }
+            
+            total_courses = len(self.df)
+            for period, count in year_counts.items():
+                usage[period] = {
+                    'description': CONTENT_USAGE_LENGTH[period],
+                    'count': count,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+        
+        return usage
+
+    def analyze_training_volume(self):
+        """
+        Analyze training volume by organization (Table 7)
+        """
+        volume = {org: {'count': 0, 'percentage': 0} for org in TRAINING_ORGANIZATIONS.keys()}
+        
+        if 'training_organization' in self.df.columns:
+            # Calculate distribution across organizations
+            org_counts = self.df['training_organization'].value_counts()
+            total_courses = len(self.df)
+            
+            for org, description in TRAINING_ORGANIZATIONS.items():
+                count = org_counts.get(org, 0)
+                volume[org] = {
+                    'description': description,
+                    'count': count,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+        
+        return volume
+
+    def analyze_content_production(self):
+        """
+        Analyze content production and sourcing (Table 8)
+        """
+        production = {source: {'count': 0, 'percentage': 0} for source in CONTENT_SOURCES.keys()}
+        
+        if 'content_source' in self.df.columns:
+            # Calculate distribution of content sources
+            source_counts = self.df['content_source'].value_counts()
+            total_courses = len(self.df)
+            
+            for source, description in CONTENT_SOURCES.items():
+                count = source_counts.get(source, 0)
+                production[source] = {
+                    'description': description,
+                    'count': count,
+                    'percentage': (count / total_courses * 100) if total_courses > 0 else 0
+                }
+        
+        return production
+
+    def analyze_training_assignment(self):
+        """
+        Analyze proactive vs required training (Table 9)
+        """
+        assignment = {
+            'self_assigned': {'count': 0, 'percentage': 0},
+            'assigned': {'count': 0, 'percentage': 0},
+            'hours_by_group': {}
+        }
+        
+        if 'assignment_type' in self.df.columns:
+            # Calculate assignment type distribution
+            type_counts = self.df['assignment_type'].value_counts()
+            total_courses = len(self.df)
+            
+            assignment['self_assigned'] = {
+                'count': type_counts.get('self_assigned', 0),
+                'percentage': (type_counts.get('self_assigned', 0) / total_courses * 100) if total_courses > 0 else 0
+            }
+            
+            assignment['assigned'] = {
+                'count': type_counts.get('assigned', 0),
+                'percentage': (type_counts.get('assigned', 0) / total_courses * 100) if total_courses > 0 else 0
+            }
+            
+            # Calculate hours by group if available
+            if 'training_hours' in self.df.columns and 'persona_type' in self.df.columns:
+                hours_by_group = self.df.groupby('persona_type')['training_hours'].sum()
+                assignment['hours_by_group'] = hours_by_group.to_dict()
+        
+        return assignment
+
+    def analyze_learner_interests(self):
+        """
+        Analyze top 10 learner interests (Table 10)
+        """
+        interests = {
+            'top_interests': [],
+            'interest_distribution': {},
+            'trending_topics': []
+        }
+        
+        if 'interest_area' in self.df.columns and 'interest_percentage' in self.df.columns:
+            # Get top 10 interests by percentage
+            top_interests = (
+                self.df.groupby('interest_area')['interest_percentage']
+                .mean()
+                .sort_values(ascending=False)
+                .head(10)
+            )
+            
+            interests['top_interests'] = [
+                {
+                    'area': area,
+                    'percentage': percentage
+                }
+                for area, percentage in top_interests.items()
+            ]
+            
+            # Calculate overall interest distribution
+            interests['interest_distribution'] = (
+                self.df.groupby('interest_area')['interest_percentage']
+                .mean()
+                .to_dict()
+            )
+            
+            # Identify trending topics (if timestamp available)
+            if 'available_from' in self.df.columns:
+                recent_interests = (
+                    self.df[self.df['available_from'] > (pd.Timestamp.now() - pd.DateOffset(months=6))]
+                    .groupby('interest_area')['interest_percentage']
+                    .mean()
+                    .sort_values(ascending=False)
+                    .head(5)
+                )
+                
+                interests['trending_topics'] = [
+                    {
+                        'area': area,
+                        'percentage': percentage
+                    }
+                    for area, percentage in recent_interests.items()
+                ]
+        
+        return interests
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
