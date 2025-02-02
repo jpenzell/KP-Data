@@ -1,47 +1,128 @@
-# LMS Content Library Analyzer
+# LMS Content Analysis Platform
 
-This program helps analyze and normalize Excel spreadsheet data from Learning Management Systems (LMS), providing insights into your content library.
+## Overview
+A comprehensive learning management system (LMS) content analysis platform that processes, analyzes, and visualizes training data across multiple dimensions. The system provides insights through interactive dashboards covering training focus, administrative metrics, content usage, and more.
 
-## Features
+## Current Status
+- **Total Records**: 12,259 courses analyzed
+- **Data Sources**: Multiple Excel files integrated
+- **Key Metrics**: Training categories, usage patterns, and quality scores implemented
+- **Documentation**: Complete technical documentation available
 
-- Loads and processes Excel spreadsheet data
-- Normalizes column names and data formats
-- Generates basic statistics and insights
-- Identifies duplicate entries
-- Creates visualizations of data completeness
-- Provides detailed summary reports
+## Quick Start
 
-## Setup
-
-1. Install the required dependencies:
+### Installation
 ```bash
+# Clone the repository
+git clone [repository-url]
+cd lms-analyzer
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the application
+streamlit run src/lms_analyzer_app.py
 ```
 
-2. Place your Excel file in the project directory
+## Documentation Index
 
-3. Run the analyzer:
-```bash
-python lms_content_analyzer.py
+### Technical Documentation
+1. [Data Processing Pipeline](docs/technical/data_processing.md)
+   - Data ingestion and standardization
+   - Processing steps
+   - Content categorization
+
+2. [Dashboard Analysis](docs/technical/dashboard_analysis.md)
+   - Analysis components
+   - Visualization details
+   - Metrics and KPIs
+
+3. [System Architecture](docs/technical/system_architecture.md)
+   - Component architecture
+   - Data flow
+   - Technical stack
+
+4. [Data Model](docs/technical/data_model.md)
+   - Core data structures
+   - Validation rules
+   - Quality metrics
+
+5. [Implementation Guide](docs/technical/implementation_guide.md)
+   - Setup instructions
+   - Code examples
+   - Best practices
+
+6. [Data Quality Report](docs/technical/data_quality_report.md)
+   - Current statistics
+   - Quality issues
+   - Recommendations
+
+## Known Issues and Next Steps
+
+### Critical Issues to Address
+1. **Date Validation**
+   - High number of invalid course versions (8,991)
+   - Missing discontinued dates (9,177)
+   - Priority: High
+
+2. **Data Quality**
+   - Temporal data gaps
+   - Cross-reference inconsistencies
+   - Priority: Medium
+
+3. **Performance**
+   - Large dataset optimization needed
+   - Caching implementation required
+   - Priority: Medium
+
+### Immediate Next Steps
+1. Implement date validation improvements
+2. Add data quality monitoring
+3. Optimize large dataset handling
+4. Complete category confidence scoring
+
+### Future Enhancements
+1. Advanced filtering capabilities
+2. Custom report generation
+3. API development
+4. Machine learning integration
+
+## Project Structure
+```
+lms_analyzer/
+├── docs/               # Complete documentation
+├── src/               # Source code
+├── tests/             # Test suite
+└── requirements.txt   # Dependencies
 ```
 
-## Usage
+## Key Files
+- `src/lms_analyzer_app.py`: Main application
+- `src/lms_content_analyzer.py`: Core analysis engine
+- `src/utils/`: Utility functions
 
-1. Modify the Excel file path in `lms_content_analyzer.py`:
-```python
-analyzer = LMSContentAnalyzer("your_excel_file.xlsx")
-```
+## Development Guidelines
 
-2. The program will:
-   - Load and clean the data
-   - Generate a summary report
-   - Create a visualization of data completeness
-   - Save the visualization as 'data_completeness.png'
+### Code Style
+- Follow PEP 8
+- Use type hints
+- Document all functions
+- Add unit tests for new features
 
-## Output
+### Git Workflow
+- Create feature branches
+- Write descriptive commits
+- Submit PRs for review
+- Keep documentation updated
 
-The program generates:
-- A console report with basic statistics
-- Information about missing data
-- A bar chart visualization showing data completeness
-- Detailed analysis of potential duplicate entries
+## Support and Contact
+- Original Developer: [Your Contact Info]
+- Project Manager: [PM Contact]
+- Documentation: [Links to additional resources]
+
+## License
+[License Information]
