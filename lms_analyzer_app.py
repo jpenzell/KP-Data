@@ -1,4 +1,7 @@
 import streamlit as st
+# Must be the first Streamlit command
+st.set_page_config(page_title="LMS Content Analysis", layout="wide")
+
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
@@ -8,9 +11,6 @@ import io
 from pathlib import Path
 
 from lms_content_analyzer import LMSContentAnalyzer
-
-# Must be the first Streamlit command
-st.set_page_config(page_title="LMS Content Analysis", layout="wide")
 
 # Constants for mapping and categorization
 TRAINING_CATEGORIES = {
@@ -433,319 +433,241 @@ def analyze_content_relationships(df):
     return relationships
 
 def main():
+    # Application Header
     st.title("LMS Content Analysis Dashboard")
+    st.markdown("""
+    This dashboard analyzes your Learning Management System (LMS) content to provide insights into:
+    - Content quality and completeness
+    - Training distribution and focus
+    - Usage patterns and engagement
+    - Resource allocation and coverage
+    """)
     
-    st.write("Upload your LMS data files. You can upload multiple files for combined analysis.")
+    # File Upload Section
+    st.header("📤 Data Upload")
+    with st.expander("Upload Instructions", expanded=True):
+        st.markdown("""
+        1. Prepare your Excel files containing LMS data
+        2. Files should include course information, usage data, and metadata
+        3. Multiple files can be uploaded for cross-reference analysis
+        4. Supported format: .xlsx
+        """)
+    
     uploaded_files = st.file_uploader("Upload Excel files", type=["xlsx"], accept_multiple_files=True)
     
-    if uploaded_files:
-        dataframes = []
+    if not uploaded_files:
+        st.info("👆 Upload your LMS data files to begin the analysis")
+        return
         
+    # Process uploaded files
+    dataframes = []
+    with st.spinner("Processing uploaded files..."):
         for uploaded_file in uploaded_files:
             try:
                 df = pd.read_excel(uploaded_file)
                 dataframes.append(df)
-                st.success(f"Successfully loaded: {uploaded_file.name}")
+                st.success(f"✅ Successfully loaded: {uploaded_file.name}")
             except Exception as e:
-                st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+                st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
                 continue
+    
+    if not dataframes:
+        st.error("No valid data files were uploaded. Please check your files and try again.")
+        return
         
-        if dataframes:
+    # Data Processing
+    try:
+        with st.spinner("Analyzing data..."):
             # Merge and standardize all data
             combined_data = merge_and_standardize_data(dataframes)
-            
-            # Calculate quality scores
             combined_data = calculate_quality_score(combined_data)
             
-            # Create analyzer with combined data
+            # Create analyzer instance
             combined_buffer = io.BytesIO()
             with pd.ExcelWriter(combined_buffer, engine='openpyxl') as writer:
                 combined_data.to_excel(writer, index=False)
             combined_buffer.seek(0)
             analyzer = LMSContentAnalyzer(combined_buffer)
-            analyzer.df = combined_data  # Use the data with quality scores
+            analyzer.df = combined_data
             
-            # Display data overview with cross-reference information
-            st.header("Data Overview")
-            st.write(f"Total unique courses: {len(combined_data)}")
-            st.write(f"Courses with multiple data sources: {len(combined_data[combined_data['cross_reference_count'] > 1])}")
-            st.write(f"Data sources: {combined_data['data_source'].nunique()}")
+            # High-level Overview
+            st.header("📊 Overview")
+            col1, col2, col3 = st.columns(3)
             
-            # Show key metrics that are available
-            metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
-            
-            with metrics_col1:
-                if 'region_entity' in combined_data.columns:
-                    st.metric("Regions", combined_data['region_entity'].nunique())
-                if 'course_type' in combined_data.columns:
-                    st.metric("Course Types", combined_data['course_type'].nunique())
-            
-            with metrics_col2:
+            with col1:
+                st.metric("Total Courses", f"{len(combined_data):,}")
                 if 'learner_count' in combined_data.columns:
                     st.metric("Total Learners", f"{combined_data['learner_count'].sum():,.0f}")
-                if 'person_type' in combined_data.columns:
-                    st.metric("Audience Types", combined_data['person_type'].nunique())
             
-            with metrics_col3:
-                if 'course_keywords' in combined_data.columns:
-                    st.metric("Unique Keywords", combined_data['course_keywords'].nunique())
-                if 'category_name' in combined_data.columns:
-                    st.metric("Categories", combined_data['category_name'].nunique())
-            
-            with metrics_col4:
-                if 'course_created_by' in combined_data.columns:
-                    st.metric("Content Authors", combined_data['course_created_by'].nunique())
-                # Calculate active courses based on available data
+            with col2:
                 active_courses = len(combined_data)
                 if 'course_discontinued_from' in combined_data.columns:
                     active_courses = len(combined_data[
                         (combined_data['course_discontinued_from'].isna()) | 
                         (combined_data['course_discontinued_from'] > pd.Timestamp.now())
                     ])
-                st.metric("Active Courses", active_courses)
+                st.metric("Active Courses", f"{active_courses:,}")
+                if 'region_entity' in combined_data.columns:
+                    st.metric("Regions Covered", combined_data['region_entity'].nunique())
             
-            # Create tabs for different analyses
-            tabs = st.tabs([
-                "Data Quality",
-                "Training Categories",
-                "Training Focus",
-                "Training Breadth",
-                "Delivery Methods",
-                "Content Usage",
-                "Training Volume",
-                "Content Production",
-                "Training Types",
-                "Learner Interests"
-            ])
+            with col3:
+                if 'data_source' in combined_data.columns:
+                    st.metric("Data Sources", combined_data['data_source'].nunique())
+                if 'cross_reference_count' in combined_data.columns:
+                    multi_source = len(combined_data[combined_data['cross_reference_count'] > 1])
+                    st.metric("Cross-Referenced Courses", f"{multi_source:,}")
             
-            with tabs[0]:
-                st.header("Data Quality Overview")
-                
-                # Quality score distribution
-                st.subheader("Quality Score Distribution")
-                fig = plot_quality_distribution(combined_data)
-                if fig:
-                    st.plotly_chart(fig)
-                
-                # Metadata completeness analysis
-                st.subheader("Metadata Completeness")
-                completeness_stats = analyze_metadata_completeness(combined_data)
-                for category, stats in completeness_stats.items():
-                    st.write(f"**{category.title()} Metadata**")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric(
-                            "Completeness",
-                            f"{stats['avg_completeness']*100:.1f}%"
-                        )
-                    with col2:
-                        st.metric(
-                            "Fields Present",
-                            f"{stats['fields_present']}/{stats['total_fields']}"
-                        )
-                    if stats['missing_fields']:
-                        st.info(f"Missing fields: {', '.join(stats['missing_fields'])}")
-                
-                # Cross-reference analysis
-                st.subheader("Cross-Reference Analysis")
-                cross_ref_stats = analyze_cross_references(combined_data)
-                st.write(f"**Multi-source Courses:** {cross_ref_stats['multi_source_courses']} "
-                        f"({cross_ref_stats['multi_source_courses']/cross_ref_stats['total_courses']*100:.1f}%)")
-                
-                if cross_ref_stats['consistency_metrics']:
-                    st.write("**Field Consistency Across Sources:**")
-                    for field, metrics in cross_ref_stats['consistency_metrics'].items():
-                        consistent_pct = metrics['consistent']/(metrics['consistent'] + metrics['inconsistent'])*100
-                        st.metric(
-                            field,
-                            f"{consistent_pct:.1f}% consistent"
-                        )
-                
-                # Temporal analysis
-                st.subheader("Temporal Analysis")
-                temporal_stats = analyze_temporal_patterns(combined_data)
-                if 'lifecycle' in temporal_stats:
-                    active_pct = temporal_stats['lifecycle']['active_courses']/len(combined_data)*100
-                    st.metric(
-                        "Active Courses",
-                        f"{temporal_stats['lifecycle']['active_courses']} ({active_pct:.1f}%)"
-                    )
-                
-                if 'creation_patterns' in temporal_stats:
-                    st.write("**Course Creation Trends**")
-                    year_data = pd.Series(temporal_stats['creation_patterns']['courses_per_year'])
-                    fig = px.line(x=year_data.index, y=year_data.values,
-                                title='Courses Created per Year')
-                    st.plotly_chart(fig)
+            # Navigation
+            st.header("🔍 Analysis Sections")
+            analysis_choice = st.radio(
+                "Select an analysis area to explore:",
+                ["Data Quality & Completeness",
+                 "Content Distribution",
+                 "Learning Impact",
+                 "Resource Allocation",
+                 "Recommendations"],
+                horizontal=True
+            )
             
-            with tabs[1]:
-                st.header("Training Categories Analysis")
+            if analysis_choice == "Data Quality & Completeness":
+                st.subheader("📋 Data Quality Analysis")
                 
-                # Display training focus distribution
+                # Quality Score Overview
+                quality_col1, quality_col2 = st.columns([2, 1])
+                with quality_col1:
+                    fig = plot_quality_distribution(combined_data)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with quality_col2:
+                    st.markdown("### Quality Metrics")
+                    completeness_stats = analyze_metadata_completeness(combined_data)
+                    for category, stats in completeness_stats.items():
+                        with st.expander(f"{category.title()} ({stats['avg_completeness']*100:.1f}% complete)"):
+                            st.metric("Fields Present", f"{stats['fields_present']}/{stats['total_fields']}")
+                            if stats['missing_fields']:
+                                st.info("Missing: " + ", ".join(stats['missing_fields']))
+                
+            elif analysis_choice == "Content Distribution":
+                st.subheader("📚 Content Distribution Analysis")
+                
+                # Category Distribution
+                st.markdown("### Training Categories")
                 focus_stats = analyze_training_focus(combined_data)
                 focus_df = pd.DataFrame(focus_stats).T
                 
-                st.subheader("Training Category Distribution")
-                fig = px.bar(focus_df, x=focus_df.index, y='percentage',
-                           title='Distribution of Training Categories')
-                st.plotly_chart(fig)
+                cat_col1, cat_col2 = st.columns([2, 1])
+                with cat_col1:
+                    fig = px.bar(focus_df, x=focus_df.index, y='percentage',
+                               title='Distribution of Training Categories')
+                    st.plotly_chart(fig, use_container_width=True)
                 
-                # Show category overlaps
-                st.subheader("Category Overlaps")
-                overlap_matrix = pd.DataFrame(index=TRAINING_CATEGORIES.keys(),
-                                           columns=TRAINING_CATEGORIES.keys())
+                with cat_col2:
+                    st.markdown("### Key Insights")
+                    top_categories = focus_df.sort_values('percentage', ascending=False).head(3)
+                    st.markdown("**Top Categories:**")
+                    for idx, row in top_categories.iterrows():
+                        st.markdown(f"- {idx}: {row['percentage']:.1f}%")
                 
-                for cat1 in TRAINING_CATEGORIES.keys():
-                    for cat2 in TRAINING_CATEGORIES.keys():
-                        overlap = (combined_data[f'is_{cat1}'] & 
-                                 combined_data[f'is_{cat2}']).sum() / len(combined_data) * 100
-                        overlap_matrix.loc[cat1, cat2] = overlap
+            elif analysis_choice == "Learning Impact":
+                st.subheader("📈 Learning Impact Analysis")
                 
-                fig = px.imshow(overlap_matrix,
-                              title='Category Overlap Heatmap (%)',
-                              labels=dict(color="Overlap %"))
-                st.plotly_chart(fig)
+                impact_col1, impact_col2 = st.columns(2)
+                
+                with impact_col1:
+                    if 'learner_count' in combined_data.columns:
+                        st.markdown("### Usage Patterns")
+                        fig = px.histogram(combined_data, x='learner_count',
+                                         title='Course Usage Distribution',
+                                         nbins=30)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with impact_col2:
+                    if 'course_type' in combined_data.columns and 'learner_count' in combined_data.columns:
+                        st.markdown("### Impact by Course Type")
+                        volume_by_type = combined_data.groupby('course_type')['learner_count'].sum()
+                        fig = px.pie(values=volume_by_type.values, names=volume_by_type.index,
+                                   title='Learning Volume Distribution')
+                        st.plotly_chart(fig, use_container_width=True)
+                
+            elif analysis_choice == "Resource Allocation":
+                st.subheader("📊 Resource Allocation Analysis")
+                
+                resource_col1, resource_col2 = st.columns(2)
+                
+                with resource_col1:
+                    if 'region_entity' in combined_data.columns:
+                        st.markdown("### Regional Distribution")
+                        region_dist = combined_data['region_entity'].value_counts()
+                        fig = px.pie(values=region_dist.values, names=region_dist.index,
+                                   title='Course Distribution by Region')
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with resource_col2:
+                    if 'data_source' in combined_data.columns:
+                        st.markdown("### Content Sources")
+                        source_dist = combined_data['data_source'].value_counts()
+                        fig = px.pie(values=source_dist.values, names=source_dist.index,
+                                   title='Content Source Distribution')
+                        st.plotly_chart(fig, use_container_width=True)
             
-            with tabs[2]:
-                st.header("Training Focus Analysis")
+            else:  # Recommendations
+                st.subheader("💡 Recommendations")
                 
-                if 'person_type' in combined_data.columns:
-                    st.subheader("Training by Audience")
-                    audience_dist = combined_data['person_type'].value_counts()
-                    fig = px.pie(values=audience_dist.values, names=audience_dist.index,
-                               title='Distribution by Audience Type')
-                    st.plotly_chart(fig)
-                else:
-                    st.info("Add person_type data to see audience distribution")
+                # Quality Improvements
+                st.markdown("### Quality Improvement Opportunities")
+                low_quality = combined_data[combined_data['quality_score'] < 0.6]
+                if not low_quality.empty:
+                    st.warning(f"Found {len(low_quality)} courses needing quality improvements")
+                    with st.expander("View Details"):
+                        st.dataframe(low_quality[['course_title', 'quality_score']].head(10))
                 
-                if 'course_type' in combined_data.columns:
-                    st.subheader("Training by Course Type")
-                    type_dist = combined_data['course_type'].value_counts()
-                    fig = px.bar(x=type_dist.index, y=type_dist.values,
-                               title='Distribution by Course Type')
-                    st.plotly_chart(fig)
-            
-            with tabs[3]:
-                st.header("Training Breadth Analysis")
-                
-                if 'region_entity' in combined_data.columns:
-                    st.subheader("Regional Distribution")
-                    region_dist = combined_data['region_entity'].value_counts()
-                    fig = px.pie(values=region_dist.values, names=region_dist.index,
-                               title='Course Distribution by Region')
-                    st.plotly_chart(fig)
-                
-                if all(col in combined_data.columns for col in ['region_entity', 'course_type']):
-                    st.subheader("Course Types by Region")
-                    region_type_matrix = pd.crosstab(
+                # Content Gaps
+                st.markdown("### Content Coverage Gaps")
+                if 'region_entity' in combined_data.columns and 'course_type' in combined_data.columns:
+                    coverage = pd.crosstab(
                         combined_data['region_entity'],
                         combined_data['course_type']
                     )
-                    fig = px.imshow(region_type_matrix,
-                                  title='Course Type Distribution by Region')
-                    st.plotly_chart(fig)
-            
-            with tabs[4]:
-                st.header("Delivery Methods Analysis")
+                    gaps = coverage[coverage < 5]
+                    if not gaps.empty:
+                        st.info("Areas with limited content coverage:")
+                        st.dataframe(gaps)
                 
-                delivery_stats = analyze_delivery_methods(combined_data)
-                if delivery_stats:
-                    st.subheader("Delivery Method Distribution")
-                    delivery_df = pd.DataFrame(list(delivery_stats['distribution'].items()),
-                                            columns=['Method', 'Count'])
-                    fig = px.pie(delivery_df, values='Count', names='Method',
-                               title='Distribution of Delivery Methods')
-                    st.plotly_chart(fig)
-                    
-                    if delivery_stats['avg_duration'] is not None:
-                        st.metric("Average Course Duration (minutes)",
-                                f"{delivery_stats['avg_duration']:.0f}")
-                else:
-                    st.info("Add delivery_method data to see delivery analysis")
-            
-            with tabs[5]:
-                st.header("Content Usage Analysis")
+                # Action Items
+                st.markdown("### Recommended Actions")
+                actions = []
                 
-                if 'course_available_from' in combined_data.columns:
-                    st.subheader("Content Age Distribution")
-                    timeline_fig = plot_timeline(combined_data, 'course_available_from')
-                    if timeline_fig:
-                        st.plotly_chart(timeline_fig)
+                if 'quality_score' in combined_data.columns:
+                    avg_quality = combined_data['quality_score'].mean()
+                    if avg_quality < 0.7:
+                        actions.append("Improve metadata completeness for better searchability")
                 
                 if 'learner_count' in combined_data.columns:
-                    st.subheader("Usage Intensity")
-                    fig = px.histogram(combined_data, x='learner_count',
-                                     title='Distribution of Learner Count',
-                                     nbins=30)
-                    st.plotly_chart(fig)
+                    unused_courses = len(combined_data[combined_data['learner_count'] == 0])
+                    if unused_courses > 0:
+                        actions.append(f"Review {unused_courses} unused courses for retirement or promotion")
+                
+                for action in actions:
+                    st.markdown(f"- {action}")
             
-            with tabs[6]:
-                st.header("Training Volume Analysis")
-                
-                if 'course_created_by' in combined_data.columns:
-                    st.subheader("Content Creation Volume")
-                    creator_stats = combined_data['course_created_by'].value_counts()
-                    fig = px.bar(x=creator_stats.index[:20], y=creator_stats.values[:20],
-                               title='Top 20 Content Creators')
-                    st.plotly_chart(fig)
-                
-                if 'learner_count' in combined_data.columns and 'course_type' in combined_data.columns:
-                    st.subheader("Learning Volume by Course Type")
-                    volume_by_type = combined_data.groupby('course_type')['learner_count'].sum()
-                    fig = px.pie(values=volume_by_type.values, names=volume_by_type.index,
-                               title='Learning Volume Distribution')
-                    st.plotly_chart(fig)
+            # Export Options
+            st.header("📥 Export Options")
+            col1, col2 = st.columns(2)
             
-            with tabs[7]:
-                st.header("Content Production Analysis")
-                
-                if 'data_source' in combined_data.columns:
-                    st.subheader("Content Sources")
-                    source_dist = combined_data['data_source'].value_counts()
-                    fig = px.pie(values=source_dist.values, names=source_dist.index,
-                               title='Content Source Distribution')
-                    st.plotly_chart(fig)
-                
-                st.subheader("Cross-Reference Analysis")
-                cross_ref_dist = combined_data['cross_reference_count'].value_counts().sort_index()
-                fig = px.bar(x=cross_ref_dist.index, y=cross_ref_dist.values,
-                           title='Distribution of Cross-References',
-                           labels={'x': 'Number of Sources', 'y': 'Number of Courses'})
-                st.plotly_chart(fig)
+            with col1:
+                if st.button("Download Analysis Report"):
+                    # Generate report logic here
+                    st.info("Report generation feature coming soon!")
             
-            with tabs[8]:
-                st.header("Training Types Analysis")
-                
-                if 'course_type' in combined_data.columns:
-                    st.subheader("Course Type Distribution")
-                    type_dist = combined_data['course_type'].value_counts()
-                    fig = px.pie(values=type_dist.values, names=type_dist.index,
-                               title='Distribution by Course Type')
-                    st.plotly_chart(fig)
-                    
-                    if 'learner_count' in combined_data.columns:
-                        st.subheader("Enrollment by Course Type")
-                        enrollment_by_type = combined_data.groupby('course_type')['learner_count'].sum()
-                        fig = px.bar(x=enrollment_by_type.index, y=enrollment_by_type.values,
-                                   title='Total Enrollments by Course Type')
-                        st.plotly_chart(fig)
-            
-            with tabs[9]:
-                st.header("Learner Interests Analysis")
-                
-                if 'description' in combined_data.columns:
-                    st.subheader("Popular Topics")
-                    descriptions = combined_data['description'].dropna()
-                    if not descriptions.empty:
-                        wordcloud_fig = create_wordcloud(" ".join(descriptions.astype(str)))
-                        st.pyplot(wordcloud_fig)
-                
-                if all(col in combined_data.columns for col in ['learner_count', 'course_type']):
-                    st.subheader("Popular Course Types")
-                    popular_types = combined_data.groupby('course_type')['learner_count'].sum().sort_values(ascending=False)
-                    fig = px.bar(x=popular_types.index, y=popular_types.values,
-                               title='Course Types by Popularity')
-                    st.plotly_chart(fig)
+            with col2:
+                if st.button("Download Processed Data"):
+                    # Download data logic here
+                    st.info("Data export feature coming soon!")
+    
+    except Exception as e:
+        st.error(f"An error occurred during analysis: {str(e)}")
+        st.exception(e)
 
 if __name__ == "__main__":
     main() 
