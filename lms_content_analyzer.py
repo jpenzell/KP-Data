@@ -19,7 +19,14 @@ warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
 
-# Constants based on the tables in the image
+# Update and expand constants to match dashboard requirements exactly
+EDUCATION_HISTORY_METRICS = {
+    'completion_tracking': {
+        'high_volume': '5k+ completions',
+        'client_volume': 'high volume clients (>5%)'
+    }
+}
+
 TRAINING_CATEGORIES = {
     'Leadership Development': [],
     'Managerial and Supervisory': [],
@@ -96,6 +103,34 @@ MARKET_REGIONS = {
     'Health Plan': 'Health Plan specific',
     'MAS': 'Mid-Atlantic States',
     'KPWA': 'Washington'
+}
+
+LEARNER_INTERESTS = {
+    'Business Skills': [],
+    'Technical Skills': [],
+    'Personal Development Skills': [],
+    'Higher Education and Certifications': [],
+    'Misc': []
+}
+
+# Update constants section with new required fields
+REQUIRED_FINANCIAL_COLUMNS = {
+    'vendor': 'Training system or content vendor',
+    'cost': 'Cost per course or content item',
+    'cost_per_learner': 'Cost per individual learner',
+    'learner_type': 'Type of learner (e.g., employee, manager, etc.)',
+    'reimbursement_amount': 'Tuition reimbursement amount',
+    'program_type': 'Type of educational program'
+}
+
+REQUIRED_ADMIN_COLUMNS = {
+    'market': 'Market or region designation',
+    'admin_count': 'Number of administrators',
+    'course_id': 'Unique course identifier',
+    'class_id': 'Unique class identifier',
+    'support_tickets': 'Number of support tickets',
+    'resolution_time': 'Average ticket resolution time',
+    'satisfaction': 'User satisfaction score'
 }
 
 class LMSContentAnalyzer:
@@ -2153,7 +2188,7 @@ class LMSContentAnalyzer:
     def analyze_education_history(self):
         """
         Analyze education history tracking (Table 1)
-        Tracks completions without enrollments and finds heavy volume clients
+        Track completions without enrollments and find heavy volume clients
         """
         history = {
             'completion_tracking': {},
@@ -2465,6 +2500,180 @@ class LMSContentAnalyzer:
                 ]
         
         return interests
+
+    def analyze_financial_metrics(self):
+        """Analyze financial aspects of training content and delivery."""
+        # Validate financial data first
+        validation = self._validate_financial_data()
+        
+        if validation['missing_columns'] or validation['invalid_data']:
+            return {
+                'validation_issues': validation,
+                'message': 'Cannot perform complete financial analysis due to missing or invalid data'
+            }
+        
+        if self.df is None:
+            return {}
+        
+        # Initialize financial metrics
+        financials = {
+            'training_spend': {},
+            'learner_costs': {},
+            'tuition_reimbursement': {
+                'total': 0,
+                'by_program': {}
+            }
+        }
+        
+        # Calculate training spend by vendor/system
+        if 'vendor' in self.df.columns:
+            spend_by_vendor = self.df.groupby('vendor')['cost'].sum()
+            financials['training_spend'] = spend_by_vendor.to_dict()
+        
+        # Calculate average learner costs
+        if 'learner_type' in self.df.columns and 'cost_per_learner' in self.df.columns:
+            avg_costs = self.df.groupby('learner_type')['cost_per_learner'].mean()
+            financials['learner_costs'] = avg_costs.to_dict()
+        
+        # Analyze tuition reimbursement data
+        if 'reimbursement_amount' in self.df.columns:
+            total_reimbursement = self.df['reimbursement_amount'].sum()
+            financials['tuition_reimbursement']['total'] = total_reimbursement
+            
+            if 'program_type' in self.df.columns:
+                program_spend = self.df.groupby('program_type')['reimbursement_amount'].sum()
+                financials['tuition_reimbursement']['by_program'] = program_spend.to_dict()
+        
+        return financials
+
+    def _validate_financial_data(self):
+        """Validate financial data columns and provide feedback."""
+        validation_results = {
+            'missing_columns': [],
+            'invalid_data': [],
+            'recommendations': []
+        }
+        
+        # Check for required columns
+        for col, description in REQUIRED_FINANCIAL_COLUMNS.items():
+            if col not in self.df.columns:
+                validation_results['missing_columns'].append({
+                    'column': col,
+                    'description': description
+                })
+        
+        if self.df is not None:
+            # Validate numeric columns
+            numeric_columns = ['cost', 'cost_per_learner', 'reimbursement_amount']
+            for col in numeric_columns:
+                if col in self.df.columns:
+                    invalid_rows = self.df[~self.df[col].apply(lambda x: isinstance(x, (int, float)) and x >= 0)].index
+                    if len(invalid_rows) > 0:
+                        validation_results['invalid_data'].append({
+                            'column': col,
+                            'invalid_rows': len(invalid_rows),
+                            'message': f'Contains non-numeric or negative values'
+                        })
+        
+        # Generate recommendations
+        if validation_results['missing_columns']:
+            validation_results['recommendations'].append(
+                'Add missing financial columns to enable cost analysis and ROI calculations'
+            )
+        if validation_results['invalid_data']:
+            validation_results['recommendations'].append(
+                'Clean up invalid numeric data in financial columns'
+            )
+        
+        return validation_results
+
+    def analyze_admin_metrics(self):
+        """Analyze administrative metrics and efficiency."""
+        # Validate admin data first
+        validation = self._validate_admin_data()
+        
+        if validation['missing_columns'] or validation['invalid_data']:
+            return {
+                'validation_issues': validation,
+                'message': 'Cannot perform complete administrative analysis due to missing or invalid data'
+            }
+        
+        if self.df is None:
+            return {}
+        
+        admin_metrics = {
+            'market_split': {},
+            'efficiency_ratios': {},
+            'support_volume': {}
+        }
+        
+        # Calculate admin distribution by market
+        if 'market' in self.df.columns and 'admin_count' in self.df.columns:
+            market_distribution = self.df.groupby('market')['admin_count'].sum()
+            admin_metrics['market_split'] = market_distribution.to_dict()
+        
+        # Calculate efficiency ratios
+        total_admins = self.df['admin_count'].sum() if 'admin_count' in self.df.columns else 0
+        if total_admins > 0:
+            total_courses = len(self.df['course_id'].unique()) if 'course_id' in self.df.columns else 0
+            total_classes = len(self.df['class_id'].unique()) if 'class_id' in self.df.columns else 0
+            
+            admin_metrics['efficiency_ratios'] = {
+                'courses_per_admin': total_courses / total_admins if total_admins > 0 else 0,
+                'classes_per_admin': total_classes / total_admins if total_admins > 0 else 0
+            }
+        
+        # Analyze support volume
+        if 'support_tickets' in self.df.columns:
+            support_metrics = {
+                'total_tickets': self.df['support_tickets'].sum(),
+                'avg_resolution_time': self.df['resolution_time'].mean() if 'resolution_time' in self.df.columns else None,
+                'satisfaction_score': self.df['satisfaction'].mean() if 'satisfaction' in self.df.columns else None
+            }
+            admin_metrics['support_volume'] = support_metrics
+        
+        return admin_metrics
+
+    def _validate_admin_data(self):
+        """Validate administrative data columns and provide feedback."""
+        validation_results = {
+            'missing_columns': [],
+            'invalid_data': [],
+            'recommendations': []
+        }
+        
+        # Check for required columns
+        for col, description in REQUIRED_ADMIN_COLUMNS.items():
+            if col not in self.df.columns:
+                validation_results['missing_columns'].append({
+                    'column': col,
+                    'description': description
+                })
+        
+        if self.df is not None:
+            # Validate numeric columns
+            numeric_columns = ['admin_count', 'support_tickets', 'resolution_time', 'satisfaction']
+            for col in numeric_columns:
+                if col in self.df.columns:
+                    invalid_rows = self.df[~self.df[col].apply(lambda x: isinstance(x, (int, float)) and x >= 0)].index
+                    if len(invalid_rows) > 0:
+                        validation_results['invalid_data'].append({
+                            'column': col,
+                            'invalid_rows': len(invalid_rows),
+                            'message': f'Contains non-numeric or negative values'
+                        })
+        
+        # Generate recommendations
+        if validation_results['missing_columns']:
+            validation_results['recommendations'].append(
+                'Add missing administrative columns to enable efficiency and support analysis'
+            )
+        if validation_results['invalid_data']:
+            validation_results['recommendations'].append(
+                'Clean up invalid numeric data in administrative columns'
+            )
+        
+        return validation_results
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
