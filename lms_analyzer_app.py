@@ -9,192 +9,446 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import io
 from pathlib import Path
+import numpy as np
 
 from lms_content_analyzer import LMSContentAnalyzer
 
 def merge_and_standardize_data(dataframes):
-    """
-    Merge multiple dataframes while properly handling duplicate courses and cross-references.
-    Returns a standardized, deduplicated dataframe with cross-reference tracking.
-    """
     if not dataframes:
         return pd.DataFrame()
     
-    # First, standardize all column names to lowercase
+    print(f"\nProcessing {len(dataframes)} data sources...")
+    
     standardized_dfs = []
+    total_rows = 0
+    
     for idx, df in enumerate(dataframes):
+        print(f"\nProcessing source {idx + 1}:")
+        print(f"Initial rows: {len(df)}")
+        
         df_copy = df.copy()
-        # Convert all column names to lowercase
-        df_copy.columns = df_copy.columns.str.lower()
+        
+        # Convert all column names to lowercase and strip whitespace
+        df_copy.columns = df_copy.columns.str.lower().str.strip()
+        
+        # Handle duplicate columns by adding suffixes
+        duplicate_cols = df_copy.columns[df_copy.columns.duplicated()].tolist()
+        if duplicate_cols:
+            print(f"Found duplicate columns in source {idx + 1}: {duplicate_cols}")
+            # Create a mapping of duplicated columns to their new names with suffixes
+            col_mapping = {}
+            for col in df_copy.columns:
+                if col in duplicate_cols:
+                    suffix = 1
+                    new_col = f"{col}_{suffix}"
+                    while new_col in col_mapping.values():
+                        suffix += 1
+                        new_col = f"{col}_{suffix}"
+                    col_mapping[col] = new_col
+                else:
+                    col_mapping[col] = col
+            # Rename columns using the mapping
+            df_copy.columns = [col_mapping.get(col, col) for col in df_copy.columns]
+        
         # Add source tracking
-        df_copy['data_sources'] = df_copy.apply(lambda x: [idx], axis=1)
+        source_name = f"Source_{idx + 1}"
+        df_copy['data_source'] = source_name
         df_copy['cross_reference_count'] = 1
-        standardized_dfs.append(df_copy)
-    
-    # Initialize with first dataframe
-    merged_df = standardized_dfs[0]
-    
-    # Create unique identifier for courses based on multiple fields
-    def generate_course_id(row):
-        identifiers = []
-        # Try different combinations of identifiers
-        if 'course_no' in row and pd.notna(row['course_no']):
-            identifiers.append(str(row['course_no']).lower().strip())
-        elif 'offering_template_no' in row and pd.notna(row['offering_template_no']):
-            identifiers.append(str(row['offering_template_no']).lower().strip())
         
-        if 'course_title' in row and pd.notna(row['course_title']):
-            identifiers.append(str(row['course_title']).lower().strip())
-        elif 'title' in row and pd.notna(row['title']):
-            identifiers.append(str(row['title']).lower().strip())
-        
-        if 'course_version' in row and pd.notna(row['course_version']):
-            identifiers.append(str(row['course_version']).lower().strip())
-        elif 'version' in row and pd.notna(row['version']):
-            identifiers.append(str(row['version']).lower().strip())
-        
-        return '_'.join(identifiers) if identifiers else None
-    
-    # Add unique identifier to first dataframe
-    merged_df['unique_course_id'] = merged_df.apply(generate_course_id, axis=1)
-    
-    # Process each additional dataframe
-    for current_df in standardized_dfs[1:]:
-        # Add unique identifier to current dataframe
-        current_df['unique_course_id'] = current_df.apply(generate_course_id, axis=1)
-        
-        # For each unique course in current dataframe
-        for course_id in current_df['unique_course_id'].unique():
-            if pd.isna(course_id):
-                continue
-                
-            # Check if course exists in merged dataframe
-            existing_mask = merged_df['unique_course_id'] == course_id
-            if existing_mask.any():
-                # Course exists - update data
-                new_mask = current_df['unique_course_id'] == course_id
-                existing_idx = existing_mask.idxmax()
-                new_idx = new_mask.idxmax()
-                
-                # Update cross-reference count
-                merged_df.loc[existing_idx, 'cross_reference_count'] += 1
-                
-                # Update data sources
-                current_sources = merged_df.loc[existing_idx, 'data_sources']
-                new_sources = current_df.loc[new_idx, 'data_sources']
-                if isinstance(current_sources, list) and isinstance(new_sources, list):
-                    merged_df.loc[existing_idx, 'data_sources'] = current_sources + new_sources
-                
-                # Merge additional data fields
-                for col in current_df.columns:
-                    if col not in ['unique_course_id', 'data_sources', 'cross_reference_count']:
-                        try:
-                            # Add column to merged_df if it doesn't exist
-                            if col not in merged_df.columns:
-                                merged_df[col] = None
-                            
-                            existing_val = merged_df.loc[existing_idx, col]
-                            new_val = current_df.loc[new_idx, col]
-                            
-                            # Handle missing or conflicting data
-                            if pd.isna(existing_val) and pd.notna(new_val):
-                                merged_df.loc[existing_idx, col] = new_val
-                            elif pd.notna(existing_val) and pd.notna(new_val) and existing_val != new_val:
-                                st.warning(f"Conflicting data found for course {course_id} in column {col}")
-                        except Exception as e:
-                            st.warning(f"Error merging column {col}: {str(e)}")
-                            continue
+        # Generate a unique identifier if course_no doesn't exist
+        if 'course_no' not in df_copy.columns:
+            print(f"Generating course_no for source {idx + 1}")
+            if 'offering_template_no' in df_copy.columns:
+                df_copy['course_no'] = df_copy['offering_template_no'].astype(str)
+            elif 'course_title' in df_copy.columns:
+                df_copy['course_no'] = df_copy['course_title'].str.lower().str.strip()
             else:
-                # New course - append to merged dataframe
-                new_course = current_df[current_df['unique_course_id'] == course_id]
-                # Ensure all columns exist
-                for col in merged_df.columns:
-                    if col not in new_course.columns:
-                        new_course[col] = None
-                merged_df = pd.concat([merged_df, new_course], ignore_index=True)
+                df_copy['course_no'] = f"source_{idx + 1}_" + df_copy.index.astype(str)
+        
+        # Ensure course_no is string and standardized
+        df_copy['course_no'] = df_copy['course_no'].astype(str).str.lower().str.strip()
+        
+        # Track the original number of rows
+        initial_rows = len(df_copy)
+        total_rows += initial_rows
+        
+        standardized_dfs.append(df_copy)
+        print(f"Processed rows from {source_name}: {initial_rows}")
     
-    # Clean up and standardize the final dataset
-    merged_df = standardize_columns(merged_df)
+    if standardized_dfs:
+        print(f"\nMerging {len(standardized_dfs)} dataframes...")
+        print(f"Total input rows: {total_rows}")
+        
+        # Concatenate all dataframes vertically
+        all_df = pd.concat(standardized_dfs, ignore_index=True)
+        print(f"Combined rows before deduplication: {len(all_df)}")
+        
+        # Create a more robust deduplication key
+        print("Creating deduplication key...")
+        all_df['dedup_key'] = all_df.apply(
+            lambda row: generate_course_id(row),
+            axis=1
+        )
+        
+        # Remove duplicate column names before groupby
+        print("Removing duplicate columns...")
+        # Get list of duplicate columns
+        duplicates = all_df.columns[all_df.columns.duplicated()].tolist()
+        if duplicates:
+            print(f"Found duplicate columns: {duplicates}")
+            # Keep only the first occurrence of each duplicate column
+            all_df = all_df.loc[:, ~all_df.columns.duplicated()]
+        
+        # Group by dedup_key and aggregate
+        print("Performing deduplication and merging...")
+        agg_dict = {
+            'cross_reference_count': 'sum',
+            'data_source': lambda x: ' | '.join(sorted(set(x)))
+        }
+        
+        # Add aggregation rules for other columns
+        for col in all_df.columns:
+            if col not in ['dedup_key', 'cross_reference_count', 'data_source']:
+                if str(col).startswith('is_'):
+                    agg_dict[col] = 'max'  # Use OR operation for boolean flags
+                elif pd.api.types.is_numeric_dtype(all_df[col]):
+                    agg_dict[col] = 'first'  # Use first value for numeric columns
+                else:
+                    agg_dict[col] = 'first'  # Use first non-null value for other columns
+        
+        # Perform the groupby operation
+        merged_df = all_df.groupby('dedup_key', as_index=False).agg(agg_dict)
+        print(f"Final rows after deduplication: {len(merged_df)}")
+        
+        # Clean up and standardize the final dataset
+        print("\nStandardizing columns...")
+        merged_df = standardize_columns(merged_df)
+        
+        # Add quality metrics
+        print("Calculating quality scores...")
+        merged_df = calculate_quality_score(merged_df)
+        
+        print(f"\nSuccessfully loaded {len(merged_df)} rows of data")
+        
+        # Print final column list for verification
+        print("\nFinal columns after processing:")
+        for col in merged_df.columns:
+            print(f"- {col}")
+        
+        return merged_df
+    else:
+        return pd.DataFrame()
+
+def generate_course_id(row):
+    """Generate a unique identifier for a course based on available fields"""
+    identifiers = []
     
-    # Add quality metrics
-    merged_df = calculate_quality_score(merged_df)
+    # Try different combinations of identifiers
+    if 'course_no' in row.index and pd.notna(row['course_no']):
+        identifiers.append(str(row['course_no']).lower().strip())
+    elif 'offering_template_no' in row.index and pd.notna(row['offering_template_no']):
+        identifiers.append(str(row['offering_template_no']).lower().strip())
     
-    # Remove temporary unique_course_id column
-    merged_df = merged_df.drop('unique_course_id', axis=1)
+    if 'course_title' in row.index and pd.notna(row['course_title']):
+        identifiers.append(str(row['course_title']).lower().strip())
+    elif 'title' in row.index and pd.notna(row['title']):
+        identifiers.append(str(row['title']).lower().strip())
     
-    return merged_df
+    if 'course_version' in row.index and pd.notna(row['course_version']):
+        identifiers.append(str(row['course_version']).lower().strip())
+    elif 'version' in row.index and pd.notna(row['version']):
+        identifiers.append(str(row['version']).lower().strip())
+    
+    return '_'.join(identifiers) if identifiers else f"unknown_{pd.util.hash_pandas_object(row).sum()}"
+
+def create_derived_columns(df):
+    """Create and transform columns dynamically based on available data"""
+    
+    # Handle missing but required columns first
+    required_columns = {
+        'cross_reference_count': 1,
+        'data_source': [],
+        'quality_score': 0.0,
+        'duration_mins': None,
+        'learner_count': 0
+    }
+    
+    for col, default_value in required_columns.items():
+        if col not in df.columns:
+            print(f"Adding missing required column: {col}")
+            df[col] = default_value
+    
+    # Create full_course_id
+    if all(col in df.columns for col in ['course_no', 'course_version']):
+        print("Creating derived column: full_course_id")
+        try:
+            df['full_course_id'] = df.apply(
+                lambda row: f"{row['course_no']}_{row['course_version']}" if pd.notna(row['course_version']) 
+                else str(row['course_no']),
+                axis=1
+            )
+        except Exception as e:
+            print(f"Warning: Could not create full_course_id: {str(e)}")
+            df['full_course_id'] = df['course_no'].astype(str)
+    
+    # Create course_duration_hours
+    if 'duration_mins' in df.columns:
+        print("Creating derived column: course_duration_hours")
+        try:
+            # Convert to numeric first to handle any string values
+            duration_mins = pd.to_numeric(df['duration_mins'], errors='coerce')
+            df['course_duration_hours'] = duration_mins.div(60)
+        except Exception as e:
+            print(f"Warning: Could not create course_duration_hours: {str(e)}")
+            df['course_duration_hours'] = None
+    
+    # Create is_active
+    if 'course_discontinued_from' in df.columns:
+        print("Creating derived column: is_active")
+        try:
+            now = pd.Timestamp.now()
+            df['is_active'] = df['course_discontinued_from'].apply(
+                lambda x: True if pd.isna(x) else pd.to_datetime(x, errors='coerce') > now
+            )
+        except Exception as e:
+            print(f"Warning: Could not create is_active: {str(e)}")
+            df['is_active'] = True
+    
+    return df
 
 def standardize_columns(df):
     """Standardize column names and data formats"""
+    # First, convert all column names to lowercase and strip whitespace
+    df.columns = df.columns.str.lower().str.strip()
+    
+    # Remove duplicate columns before any processing
+    df = df.loc[:, ~df.columns.duplicated(keep='first')]
+    
     # Standardize column names
     column_mapping = {
-        'Course Title': 'course_title',
-        'Course No': 'course_no',
-        'Course Description': 'course_description',
-        'Course Abstract': 'course_abstract',
-        'Course Version': 'course_version',
-        'Course Created By': 'course_created_by',
-        'Course Available From': 'course_available_from',
-        'Course Discontinued From': 'course_discontinued_from',
-        'Course Keywords': 'course_keywords',
-        'Category Name': 'category_name'
+        # Original exact matches (lowercase)
+        'course_id': 'course_id',
+        'course_title': 'course_title',
+        'total_2024_activity': 'total_2024_activity',
+        'duration_mins': 'duration_mins',
+        'avg hrs spent per completion': 'avg_hours_per_completion',
+        'data_source': 'data_source',
+        'cross_reference_count': 'cross_reference_count',
+        'course_duration_hours': 'course_duration_hours',
+        'quality_score': 'quality_score',
+        'learner_count': 'learner_count',
+        'no_of_learners': 'learner_count',
+        
+        # Alternative names
+        'course title': 'course_title',
+        'course no': 'course_no',
+        'course description': 'course_description',
+        'course abstract': 'course_abstract',
+        'course version': 'course_version',
+        'course created by': 'course_created_by',
+        'course available from': 'course_available_from',
+        'avail_from': 'course_available_from',
+        'course discontinued from': 'course_discontinued_from',
+        'disc_from': 'course_discontinued_from',
+        'course keywords': 'course_keywords',
+        'category name': 'category_name',
+        'dur mins': 'duration_mins',
+        'duration minutes': 'duration_mins',
+        'duration': 'duration_mins',
+        'data source': 'data_source',
+        'source': 'data_source',
+        'students': 'learner_count',
+        'region': 'region_entity',
+        'region entity': 'region_entity',
+        'cross references': 'cross_reference_count',
+        'title': 'course_title',
+        'description': 'course_description',
+        'abstract': 'course_abstract',
+        'version': 'course_version',
+        'type': 'course_type',
+        'average hours per completion': 'avg_hours_per_completion',
+        'avg hours per completion': 'avg_hours_per_completion',
+        'hours per completion': 'avg_hours_per_completion'
     }
+    
+    # Apply column mapping
     df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
     
-    # Convert date columns
+    # Remove any remaining duplicate columns after mapping
+    df = df.loc[:, ~df.columns.duplicated(keep='first')]
+    
+    # Ensure course_no is always treated as string
+    if 'course_no' in df.columns:
+        df['course_no'] = df['course_no'].astype(str)
+    
+    # Convert date columns with better error handling
     date_columns = ['course_version', 'course_available_from', 'course_discontinued_from']
     for col in date_columns:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
-            df[f'{col}_is_valid'] = df[col].notna()
+            try:
+                # Create a new Series for dates and validation flags
+                temp_dates = pd.Series(index=df.index, dtype='datetime64[ns]')
+                validation_flags = pd.Series(index=df.index, dtype=bool)
+                
+                # Process each date value
+                for idx in df.index:
+                    try:
+                        val = df.at[idx, col]
+                        if pd.isna(val):
+                            temp_dates.at[idx] = pd.NaT
+                            validation_flags.at[idx] = False
+                        else:
+                            parsed_date = pd.to_datetime(val, errors='coerce')
+                            temp_dates.at[idx] = parsed_date
+                            validation_flags.at[idx] = pd.notna(parsed_date)
+                    except:
+                        temp_dates.at[idx] = pd.NaT
+                        validation_flags.at[idx] = False
+                
+                # Assign processed dates and validation flags
+                df[col] = temp_dates
+                df[f'{col}_is_valid'] = validation_flags
+                
+                # Log warning for invalid dates
+                invalid_count = (~validation_flags).sum()
+                if invalid_count > 0:
+                    print(f"Warning: {col} has {invalid_count} invalid or missing dates")
+            
+            except Exception as e:
+                print(f"Warning: Could not process dates for {col}: {str(e)}")
+                df[col] = pd.NaT
+                df[f'{col}_is_valid'] = False
+    
+    # Convert numeric columns with better error handling
+    numeric_columns = [
+        'duration_mins', 
+        'learner_count', 
+        'cross_reference_count',
+        'total_2024_activity',
+        'avg_hours_per_completion',
+        'course_duration_hours'
+    ]
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            try:
+                # Create a temporary series for numeric conversion
+                temp_numeric = pd.Series(index=df.index, dtype='float64')
+                
+                for idx in df.index:
+                    try:
+                        val = df.at[idx, col]
+                        # Handle complex objects
+                        if isinstance(val, (list, set)) and len(val) > 0:
+                            val = val[0]
+                        elif isinstance(val, dict) and len(val) > 0:
+                            val = list(val.values())[0]
+                        
+                        # Convert to numeric
+                        temp_numeric.at[idx] = pd.to_numeric(val, errors='coerce')
+                    except:
+                        temp_numeric.at[idx] = np.nan
+                
+                df[col] = temp_numeric
+                
+                # Fill NaN with 0 for count-based columns
+                if col in ['learner_count', 'cross_reference_count', 'total_2024_activity']:
+                    df[col] = df[col].fillna(0)
+            except Exception as e:
+                print(f"Warning: Could not convert {col} to numeric: {str(e)}")
+                continue
+    
+    # Convert boolean columns
+    boolean_columns = [
+        'is_leadership_development',
+        'is_managerial_supervisory',
+        'is_mandatory_compliance',
+        'is_profession_specific',
+        'is_interpersonal_skills',
+        'is_it_systems',
+        'is_clinical',
+        'is_nursing',
+        'is_pharmacy',
+        'is_safety',
+        'has_direct_reports'
+    ]
+    
+    for col in boolean_columns:
+        if col in df.columns:
+            try:
+                df[col] = df[col].fillna(False).astype(bool)
+            except Exception as e:
+                print(f"Warning: Could not convert {col} to boolean: {str(e)}")
+                df[col] = False
+    
+    # Print column info for debugging
+    print("\nFinal column names:")
+    for col in df.columns:
+        print(f"- {col}")
     
     return df
 
 def calculate_quality_score(df):
     """Calculate quality score based on data completeness and cross-references"""
-    if 'quality_score' not in df.columns:
+    try:
+        # Initialize quality score column if it doesn't exist
+        if 'quality_score' not in df.columns:
+            df['quality_score'] = 0.0
+        
+        # Weight factors for quality score
+        weights = {
+            'completeness': 0.4,
+            'cross_references': 0.3,
+            'data_validation': 0.3
+        }
+        
+        # Calculate completeness score
+        required_fields = ['course_title', 'course_description', 'course_no', 'category_name']
+        available_fields = [field for field in required_fields if field in df.columns]
+        
+        if available_fields:
+            # Calculate completeness for each field
+            completeness_scores = pd.DataFrame()
+            for field in available_fields:
+                completeness_scores[field] = df[field].notna().astype(float)
+            
+            # Calculate mean completeness score
+            df['completeness_score'] = completeness_scores.mean(axis=1)
+        else:
+            df['completeness_score'] = 0.0
+        
+        # Calculate cross-reference score
+        if 'cross_reference_count' in df.columns:
+            cross_ref_counts = pd.to_numeric(df['cross_reference_count'], errors='coerce').fillna(1)
+            df['cross_reference_score'] = (cross_ref_counts - 1).div(3).clip(0, 1)
+        else:
+            df['cross_reference_score'] = 0.0
+        
+        # Calculate data validation score
+        validation_columns = [col for col in df.columns if col.endswith('_is_valid')]
+        if validation_columns:
+            validation_scores = df[validation_columns].astype(float)
+            df['validation_score'] = validation_scores.mean(axis=1)
+        else:
+            df['validation_score'] = 0.0
+        
+        # Calculate final quality score
+        df['quality_score'] = (
+            weights['completeness'] * df['completeness_score'] +
+            weights['cross_references'] * df['cross_reference_score'] +
+            weights['data_validation'] * df['validation_score']
+        )
+        
+        # Clean up intermediate columns
+        columns_to_drop = ['completeness_score', 'cross_reference_score', 'validation_score']
+        df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
+        
+        return df
+    
+    except Exception as e:
+        print(f"Warning: Error calculating quality score: {str(e)}")
         df['quality_score'] = 0.0
-    
-    # Weight factors for quality score
-    weights = {
-        'completeness': 0.4,
-        'cross_references': 0.3,
-        'data_validation': 0.3
-    }
-    
-    # Calculate completeness score
-    required_fields = ['course_title', 'course_description', 'course_no', 'category_name']
-    completeness_scores = []
-    for field in required_fields:
-        if field in df.columns:
-            completeness_scores.append(df[field].notna().astype(float))
-    if completeness_scores:
-        df['completeness_score'] = sum(completeness_scores) / len(completeness_scores)
-    else:
-        df['completeness_score'] = 0.0
-    
-    # Calculate cross-reference score
-    df['cross_reference_score'] = (df['cross_reference_count'] - 1) / 3  # Normalize to max of 3 sources
-    df['cross_reference_score'] = df['cross_reference_score'].clip(0, 1)
-    
-    # Calculate data validation score
-    validation_scores = []
-    date_columns = [col for col in df.columns if col.endswith('_is_valid')]
-    if date_columns:
-        validation_scores.append(df[date_columns].mean(axis=1))
-    df['validation_score'] = pd.concat(validation_scores, axis=1).mean(axis=1) if validation_scores else 0.0
-    
-    # Calculate final quality score
-    df['quality_score'] = (
-        weights['completeness'] * df['completeness_score'] +
-        weights['cross_references'] * df['cross_reference_score'] +
-        weights['data_validation'] * df['validation_score']
-    )
-    
-    # Clean up intermediate columns
-    df = df.drop(['completeness_score', 'cross_reference_score', 'validation_score'], axis=1)
-    
-    return df
+        return df
 
 # Constants for mapping and categorization
 TRAINING_CATEGORIES = {
@@ -302,7 +556,7 @@ def categorize_content(df):
         
         # Combine text fields with weights
         for col, weight in text_columns.items():
-            if col in df.columns and pd.notna(row.get(col)):
+            if col in df.columns and isinstance(row.get(col), (str, float, int)) and pd.notna(row.get(col)):
                 text = str(row.get(col, '')).lower()
                 combined_text += ' ' + text  # Add space to separate fields
         
@@ -465,7 +719,9 @@ def analyze_trends(df):
     
     # Quality score trends
     if 'quality_score' in df.columns and 'course_available_from' in df.columns:
-        df['year'] = pd.to_datetime(df['course_available_from']).dt.year
+        # Convert course_available_from to datetime if it isn't already
+        df['course_available_from'] = pd.to_datetime(df['course_available_from'], errors='coerce')
+        df['year'] = df['course_available_from'].dt.year
         quality_trends = df.groupby('year')['quality_score'].agg(['mean', 'count']).reset_index()
         trends['quality_over_time'] = quality_trends.to_dict('records')
     
@@ -473,10 +729,15 @@ def analyze_trends(df):
     for category in TRAINING_CATEGORIES.keys():
         cat_col = f'is_{category.lower()}'
         if cat_col in df.columns and 'course_available_from' in df.columns:
-            cat_trend = df[df[cat_col]].groupby(
-                pd.to_datetime(df['course_available_from']).dt.year
-            ).size().reset_index(name='count')
-            trends[f'{category}_evolution'] = cat_trend.to_dict('records')
+            # Ensure we have a datetime column and create year
+            df['course_available_from'] = pd.to_datetime(df['course_available_from'], errors='coerce')
+            df['year'] = df['course_available_from'].dt.year
+            
+            # Group by year and count occurrences where the category is True
+            cat_trend = df[df[cat_col]].groupby('year').size().reset_index(name='count')
+            
+            if not cat_trend.empty:
+                trends[f'{category}_evolution'] = cat_trend.to_dict('records')
     
     return trends
 
@@ -785,7 +1046,7 @@ def main():
                     if not cross_ref_issues.empty:
                         st.warning(f"{len(cross_ref_issues)} courses have insufficient cross-references")
                         st.dataframe(
-                            cross_ref_issues[['course_id', 'course_title', 'cross_reference_count', 'data_sources']],
+                            cross_ref_issues[['course_id', 'course_title', 'cross_reference_count', 'data_source']],
                             use_container_width=True
                         )
                     else:
@@ -868,17 +1129,17 @@ def main():
                 resource_col1, resource_col2 = st.columns(2)
                 
                 with resource_col1:
-                    if 'region_entity' in learning_data.columns:
+                    if 'region_entity' in combined_data.columns:
                         st.markdown("### Regional Distribution")
-                        region_dist = learning_data['region_entity'].value_counts()
+                        region_dist = combined_data['region_entity'].value_counts()
                         fig = px.pie(values=region_dist.values, names=region_dist.index,
                                    title='Course Distribution by Region')
                         st.plotly_chart(fig, use_container_width=True)
                 
                 with resource_col2:
-                    if 'data_source' in learning_data.columns:
+                    if 'data_source' in combined_data.columns:
                         st.markdown("### Content Sources")
-                        source_dist = learning_data['data_source'].value_counts()
+                        source_dist = combined_data['data_source'].value_counts()
                         fig = px.pie(values=source_dist.values, names=source_dist.index,
                                    title='Content Source Distribution')
                         st.plotly_chart(fig, use_container_width=True)
@@ -890,7 +1151,7 @@ def main():
                 financial_data = handle_missing_data(combined_data, 'financial')
                 
                 # Get financial metrics and validation results
-                financials = analyzer.analyze_financial_metrics(financial_data)
+                financials = analyzer.analyze_financial_metrics()
                 
                 if 'validation_issues' in financials:
                     with st.expander("Data Requirements & Options", expanded=True):
@@ -940,7 +1201,7 @@ def main():
                 admin_data = handle_missing_data(combined_data, 'administrative')
                 
                 # Get admin metrics and validation results
-                admin_metrics = analyzer.analyze_admin_metrics(admin_data)
+                admin_metrics = analyzer.analyze_admin_metrics()
                 
                 if 'validation_issues' in admin_metrics:
                     with st.expander("Data Requirements & Options", expanded=True):
@@ -999,9 +1260,15 @@ def main():
                     with tab:
                         if f'{category}_evolution' in trends:
                             cat_df = pd.DataFrame(trends[f'{category}_evolution'])
-                            fig = px.line(cat_df, x='course_available_from', y='count',
-                                        title=f'{category.replace("_", " ").title()} Courses Over Time')
-                            st.plotly_chart(fig, use_container_width=True)
+                            if not cat_df.empty:
+                                try:
+                                    fig = px.line(cat_df, x='year', y='count',
+                                                title=f'{category.replace("_", " ").title()} Courses Over Time')
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.warning(f"Could not plot trend for {category}: {str(e)}")
+                            else:
+                                st.info(f"No trend data available for {category}")
                 
                 # Predictive Analysis
                 st.markdown("### 🔮 Predictive Insights")
