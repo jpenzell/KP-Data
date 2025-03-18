@@ -10,9 +10,80 @@ from wordcloud import WordCloud
 import io
 from pathlib import Path
 import numpy as np
+import sys
+import os
+
+# Add src directory to path to allow importing from src.utils
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from lms_content_analyzer import LMSContentAnalyzer
+# Import the new optimization functions
+try:
+    from src.utils.optimizations import (
+        remove_unnamed_columns,
+        clean_column_names,
+        enhanced_date_repair,
+        process_in_chunks,
+        optimize_memory_usage_enhanced,
+        measure_execution_time,
+        fix_row_count_discrepancy
+    )
+    print("Successfully imported optimization utilities")
+except ImportError as e:
+    print(f"Warning: Could not import optimization utilities: {e}")
+    print("Falling back to basic optimization functions")
+    # Define basic fallback functions if imports fail
+    @st.cache_data(ttl=3600)
+    def optimize_memory_usage_enhanced(df):
+        return optimize_memory_usage(df)
+        
+    @st.cache_data(ttl=3600)
+    def enhanced_date_repair(df):
+        return repair_date_fields(df)
+        
+    def measure_execution_time(func):
+        return func
 
+# Performance optimization functions
+@st.cache_data(ttl=3600)
+def optimize_memory_usage(df):
+    """
+    Optimize memory usage by converting data types to more efficient ones.
+    """
+    df_optimized = df.copy()
+    for col in df_optimized.columns:
+        if df_optimized[col].dtype == 'float64':
+            df_optimized[col] = df_optimized[col].astype('float32')
+        elif df_optimized[col].dtype == 'int64':
+            df_optimized[col] = df_optimized[col].astype('int32')
+        elif df_optimized[col].dtype == 'object':
+            if df_optimized[col].nunique() / len(df_optimized[col]) < 0.5:  # Low cardinality
+                df_optimized[col] = df_optimized[col].astype('category')
+    return df_optimized
+
+@st.cache_data(ttl=3600)
+def repair_date_fields(df):
+    """
+    Repair and validate date fields where possible.
+    """
+    df_fixed = df.copy()
+    
+    # For course_version, use the earliest available date if missing
+    if 'course_available_from' in df_fixed.columns and 'course_version' in df_fixed.columns:
+        mask = df_fixed['course_version'].isna() & df_fixed['course_available_from'].notna()
+        df_fixed.loc[mask, 'course_version'] = df_fixed.loc[mask, 'course_available_from']
+    
+    # Handle missing discontinued dates by setting a future date for active courses
+    if 'course_discontinued_from' in df_fixed.columns:
+        mask = df_fixed['course_discontinued_from'].isna()
+        # Set to a far future date (e.g., 10 years from now) for still-active courses
+        df_fixed.loc[mask, 'course_discontinued_from'] = pd.Timestamp.now() + pd.DateOffset(years=10)
+        
+    return df_fixed
+
+# Add caching to data loading and processing functions
+@st.cache_data(ttl=3600)
+@measure_execution_time  # Add execution time measurement
 def merge_and_standardize_data(dataframes):
     if not dataframes:
         return pd.DataFrame()
@@ -83,12 +154,19 @@ def merge_and_standardize_data(dataframes):
         all_df = pd.concat(standardized_dfs, ignore_index=True)
         print(f"Combined rows before deduplication: {len(all_df)}")
         
-        # Create a more robust deduplication key
-        print("Creating deduplication key...")
-        all_df['dedup_key'] = all_df.apply(
-            lambda row: generate_course_id(row),
-            axis=1
-        )
+        # For large datasets, use chunked processing
+        if len(all_df) > 10000:
+            print("Large dataset detected, using chunked processing for deduplication key creation...")
+            chunk_size = 10000
+            chunks = [all_df.iloc[i:i+chunk_size] for i in range(0, len(all_df), chunk_size)]
+            for i, chunk in enumerate(chunks):
+                print(f"Processing chunk {i+1}/{len(chunks)}...")
+                # Create a robust deduplication key using vectorized operations
+                chunks[i] = create_deduplication_key(chunk)
+            all_df = pd.concat(chunks, ignore_index=True)
+        else:
+            # Create a robust deduplication key using vectorized operations
+            all_df = create_deduplication_key(all_df)
         
         # Remove duplicate column names before groupby
         print("Removing duplicate columns...")
@@ -128,6 +206,17 @@ def merge_and_standardize_data(dataframes):
         print("Calculating quality scores...")
         merged_df = calculate_quality_score(merged_df)
         
+        # Apply enhanced date field repairs
+        print("Applying enhanced date repair...")
+        merged_df = enhanced_date_repair(merged_df)
+        
+        # Apply enhanced memory optimization
+        print("Applying enhanced memory optimization...")
+        merged_df = optimize_memory_usage_enhanced(merged_df)
+        
+        # Clean column names for consistency
+        merged_df = clean_column_names(merged_df)
+        
         print(f"\nSuccessfully loaded {len(merged_df)} rows of data")
         
         # Print final column list for verification
@@ -138,6 +227,38 @@ def merge_and_standardize_data(dataframes):
         return merged_df
     else:
         return pd.DataFrame()
+
+def create_deduplication_key(df):
+    """
+    Create a deduplication key using vectorized operations.
+    
+    Args:
+        df: DataFrame to process
+        
+    Returns:
+        DataFrame with deduplication key added
+    """
+    print("Creating deduplication key...")
+    
+    # Initialize dedup_key with course_no
+    df['dedup_key'] = df['course_no'].astype(str).str.lower().str.strip()
+    
+    # For rows where offering_template_no is available and course_no is missing or generic
+    if 'offering_template_no' in df.columns:
+        mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
+        df.loc[mask, 'dedup_key'] = df.loc[mask, 'offering_template_no'].astype(str).str.lower().str.strip()
+    
+    # For rows where course_title is available and dedup_key is still missing
+    if 'course_title' in df.columns:
+        mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
+        df.loc[mask, 'dedup_key'] = df.loc[mask, 'course_title'].astype(str).str.lower().str.strip()
+    
+    # Ensure every row has a dedup_key
+    mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
+    if mask.any():
+        df.loc[mask, 'dedup_key'] = "unknown_" + df.loc[mask].index.astype(str)
+    
+    return df
 
 def generate_course_id(row):
     """Generate a unique identifier for a course based on available fields"""
@@ -937,7 +1058,12 @@ def main():
                 combined_data.to_excel(writer, index=False)
             combined_buffer.seek(0)
             analyzer = LMSContentAnalyzer(combined_buffer)
-            analyzer.df = combined_data
+            
+            # Fix row count discrepancy if it exists
+            if len(analyzer.df) < len(combined_data):
+                print(f"Row count discrepancy detected: {len(combined_data)} merged rows vs {len(analyzer.df)} analyzer rows")
+                print("Using the complete merged dataset to ensure all data is included")
+                analyzer.df = combined_data
             
             # High-level Overview
             st.header("📊 Overview")

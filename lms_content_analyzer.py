@@ -197,9 +197,8 @@ class LMSContentAnalyzer:
             self._classify_columns()
             self._convert_date_columns()
             
-            # Remove duplicate entries if any
-            if 'course_title' in self.df.columns:
-                self.df.drop_duplicates(subset=['course_title'], keep='first', inplace=True)
+            # No longer filtering out duplicate rows - keeping all data
+            # This comment replaces the previous code that removed duplicates
             
             print(f"\nSuccessfully loaded {len(self.df)} rows of data")
         except Exception as e:
