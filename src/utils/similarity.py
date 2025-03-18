@@ -61,6 +61,9 @@ def compute_content_similarity(df: pd.DataFrame,
     """
     print(f"Computing content similarity using columns: {text_columns}")
     
+    # Create a copy of the dataframe to avoid modifying the original
+    df = df.copy()
+    
     # Prepare a combined text column for similarity analysis
     df['combined_text'] = ''
     
@@ -75,17 +78,23 @@ def compute_content_similarity(df: pd.DataFrame,
     # Create weighted combined text
     for col in text_columns:
         if col in df.columns:
+            # Check if column is categorical and convert to string if needed
+            if pd.api.types.is_categorical_dtype(df[col]):
+                print(f"Converting categorical column {col} to string")
+                df[col] = df[col].astype(str)
+            
             # Apply the weight by repeating the text
             weight = weights.get(col, 1.0)
             
             # For title, repeat it based on weight
             if col == 'course_title':
-                df['combined_text'] += df[col].fillna('').apply(
+                # Handle non-string columns safely
+                df['combined_text'] += df[col].fillna('').astype(str).apply(
                     lambda x: (preprocess_text(x) + ' ') * int(weight)
                 )
             else:
                 # For other columns, just add the text
-                df['combined_text'] += df[col].fillna('').apply(
+                df['combined_text'] += df[col].fillna('').astype(str).apply(
                     lambda x: preprocess_text(x) + ' '
                 )
     
@@ -151,14 +160,32 @@ def compute_content_similarity(df: pd.DataFrame,
         similar_df = similar_df.head(max_results)
         
         # Add titles and other metadata for easier interpretation
-        id_to_title = df.set_index('course_id')['course_title'].to_dict()
-        id_to_category = df.set_index('course_id')['category_name'].to_dict()
-        id_to_dept = df.set_index('course_id')['sponsoring_dept'].to_dict() if 'sponsoring_dept' in df.columns else {}
+        id_to_title = df.set_index('course_id')['course_title'].astype(str).to_dict()
+        
+        # Handle category_name which might be categorical
+        if 'category_name' in df.columns:
+            if pd.api.types.is_categorical_dtype(df['category_name']):
+                id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
+            else:
+                id_to_category = df.set_index('course_id')['category_name'].to_dict()
+        else:
+            id_to_category = {}
+        
+        # Handle sponsoring_dept which might be categorical
+        if 'sponsoring_dept' in df.columns:
+            if pd.api.types.is_categorical_dtype(df['sponsoring_dept']):
+                id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
+            else:
+                id_to_dept = df.set_index('course_id')['sponsoring_dept'].to_dict()
+        else:
+            id_to_dept = {}
         
         similar_df['title_1'] = similar_df['course_id_1'].map(id_to_title)
         similar_df['title_2'] = similar_df['course_id_2'].map(id_to_title)
-        similar_df['category_1'] = similar_df['course_id_1'].map(id_to_category)
-        similar_df['category_2'] = similar_df['course_id_2'].map(id_to_category)
+        
+        if id_to_category:
+            similar_df['category_1'] = similar_df['course_id_1'].map(id_to_category)
+            similar_df['category_2'] = similar_df['course_id_2'].map(id_to_category)
         
         if id_to_dept:
             similar_df['dept_1'] = similar_df['course_id_1'].map(id_to_dept)
@@ -428,6 +455,14 @@ def generate_consolidation_recommendations(similarity_df: pd.DataFrame,
     if similarity_df.empty:
         return pd.DataFrame()
     
+    # Create a copy of the dataframe to avoid modifying the original
+    df = df.copy()
+    
+    # Convert any categorical columns to string to avoid issues
+    for col in df.columns:
+        if pd.api.types.is_categorical_dtype(df[col]):
+            df[col] = df[col].astype(str)
+    
     # Identify potential duplicates
     duplicates = find_potential_duplicates(similarity_df, high_threshold)
     
@@ -507,6 +542,9 @@ def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
         'tables': {}
     }
     
+    # Create a safe copy of the dataframe
+    df = df.copy()
+    
     # Ensure required columns exist
     required_columns = ['course_id', 'course_title']
     if not all(col in df.columns for col in required_columns):
@@ -514,49 +552,65 @@ def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
         return results
     
     # Compute text similarity
-    similarity_df = compute_content_similarity(df)
+    try:
+        similarity_df = compute_content_similarity(df)
+    except Exception as e:
+        print(f"Error computing content similarity: {str(e)}")
+        return results
     
     if not similarity_df.empty:
         # Store similarity data
         results['tables']['similarity_pairs'] = similarity_df
         
         # Find potential duplicates
-        duplicates = find_potential_duplicates(similarity_df)
-        if not duplicates.empty:
-            results['tables']['potential_duplicates'] = duplicates
-            
-            # Generate consolidation recommendations
-            recommendations = generate_consolidation_recommendations(similarity_df, df)
-            if not recommendations.empty:
-                results['tables']['consolidation_recommendations'] = recommendations
+        try:
+            duplicates = find_potential_duplicates(similarity_df)
+            if not duplicates.empty:
+                results['tables']['potential_duplicates'] = duplicates
+                
+                # Generate consolidation recommendations
+                recommendations = generate_consolidation_recommendations(similarity_df, df)
+                if not recommendations.empty:
+                    results['tables']['consolidation_recommendations'] = recommendations
+        except Exception as e:
+            print(f"Error finding potential duplicates: {str(e)}")
         
         # Create network visualization
-        network_fig = plot_similarity_network(similarity_df)
-        results['figures']['similarity_network'] = network_fig
+        try:
+            network_fig = plot_similarity_network(similarity_df)
+            results['figures']['similarity_network'] = network_fig
+        except Exception as e:
+            print(f"Error creating network visualization: {str(e)}")
         
         # If department data exists, create department similarity heatmap
         if 'dept_1' in similarity_df.columns and 'dept_2' in similarity_df.columns:
-            dept_fig = plot_department_similarity_heatmap(similarity_df)
-            results['figures']['department_similarity'] = dept_fig
+            try:
+                dept_fig = plot_department_similarity_heatmap(similarity_df)
+                results['figures']['department_similarity'] = dept_fig
+            except Exception as e:
+                print(f"Error creating department heatmap: {str(e)}")
         
         # Calculate metrics
-        high_similarity_pairs = len(similarity_df[similarity_df['similarity_score'] >= 0.8])
-        medium_similarity_pairs = len(similarity_df[(similarity_df['similarity_score'] >= 0.6) & 
-                                                 (similarity_df['similarity_score'] < 0.8)])
-        
-        results['metrics']['similarity_counts'] = {
-            'total_pairs': len(similarity_df),
-            'high_similarity': high_similarity_pairs,
-            'medium_similarity': medium_similarity_pairs,
-            'potential_duplicates': len(duplicates) if 'potential_duplicates' in results['tables'] else 0
-        }
-        
-        # Calculate cross-department similarity if possible
-        if 'is_cross_dept' in similarity_df.columns:
-            cross_dept_pairs = similarity_df['is_cross_dept'].sum()
-            results['metrics']['cross_department'] = {
-                'total_cross_dept_pairs': cross_dept_pairs,
-                'percent_cross_dept': (cross_dept_pairs / len(similarity_df) * 100) if len(similarity_df) > 0 else 0
+        try:
+            high_similarity_pairs = len(similarity_df[similarity_df['similarity_score'] >= 0.8])
+            medium_similarity_pairs = len(similarity_df[(similarity_df['similarity_score'] >= 0.6) & 
+                                                     (similarity_df['similarity_score'] < 0.8)])
+            
+            results['metrics']['similarity_counts'] = {
+                'total_pairs': len(similarity_df),
+                'high_similarity': high_similarity_pairs,
+                'medium_similarity': medium_similarity_pairs,
+                'potential_duplicates': len(duplicates) if 'potential_duplicates' in results['tables'] else 0
             }
+            
+            # Calculate cross-department similarity if possible
+            if 'is_cross_dept' in similarity_df.columns:
+                cross_dept_pairs = similarity_df['is_cross_dept'].sum()
+                results['metrics']['cross_department'] = {
+                    'total_cross_dept_pairs': cross_dept_pairs,
+                    'percent_cross_dept': (cross_dept_pairs / len(similarity_df) * 100) if len(similarity_df) > 0 else 0
+                }
+        except Exception as e:
+            print(f"Error calculating metrics: {str(e)}")
     
     return results 
