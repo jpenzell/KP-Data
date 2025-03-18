@@ -214,7 +214,8 @@ def merge_and_standardize_data(dataframes):
         print("Applying enhanced memory optimization...")
         merged_df = optimize_memory_usage_enhanced(merged_df)
         
-        # Clean column names for consistency
+        # Ensure all column names are properly standardized
+        print("Applying enhanced column name standardization...")
         merged_df = clean_column_names(merged_df)
         
         print(f"\nSuccessfully loaded {len(merged_df)} rows of data")
@@ -1091,6 +1092,139 @@ def main():
                 if 'cross_reference_count' in combined_data.columns:
                     multi_source = len(combined_data[combined_data['cross_reference_count'] > 1])
                     st.metric("Cross-Referenced Courses", f"{multi_source:,}")
+            
+            # Data Quality Dashboard
+            st.header("🔍 Data Quality Dashboard")
+            st.markdown("""
+            This dashboard provides detailed metrics about the quality of your learning content data. 
+            Use these insights to identify areas that need attention for data cleansing and enrichment.
+            """)
+            
+            # Get data quality metrics and visualizations
+            from src.utils.visualization import plot_data_quality_metrics
+            quality_results = plot_data_quality_metrics(combined_data)
+            
+            # Create tabs for different quality aspects
+            quality_dashboard_tabs = st.tabs([
+                "Overall Metrics", 
+                "Data Completeness", 
+                "Date Quality",
+                "Cross-References",
+                "Issues Summary"
+            ])
+            
+            # Overall Metrics Tab
+            with quality_dashboard_tabs[0]:
+                if 'overall_quality' in quality_results['metrics']:
+                    metrics = quality_results['metrics']['overall_quality']
+                    
+                    # Display key metrics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Mean Quality Score", f"{metrics['mean_score']}")
+                    with col2:
+                        st.metric("High Quality Records", f"{metrics['high_quality']:,} ({metrics['percent_high_quality']}%)")
+                    with col3:
+                        st.metric("Low Quality Records", f"{metrics['low_quality']:,}")
+                
+                # Display quality categories chart
+                if 'quality_categories' in quality_results['figures']:
+                    st.plotly_chart(quality_results['figures']['quality_categories'], use_container_width=True)
+                    
+                    st.markdown("""
+                    **Quality Score Categories:**
+                    - **Excellent (0.8-1.0)**: Complete data with multiple cross-references
+                    - **Good (0.6-0.8)**: Mostly complete with some cross-references
+                    - **Fair (0.4-0.6)**: Partially complete with limited verification
+                    - **Poor (0.2-0.4)**: Incomplete data with significant gaps
+                    - **Very Poor (0.0-0.2)**: Minimal usable data
+                    """)
+            
+            # Data Completeness Tab
+            with quality_dashboard_tabs[1]:
+                if 'completeness' in quality_results['figures']:
+                    st.plotly_chart(quality_results['figures']['completeness'], use_container_width=True)
+                    
+                    st.markdown("""
+                    **Understanding Data Completeness:**
+                    - Columns below the 80% threshold need attention for data enrichment
+                    - Missing critical fields limit analysis capabilities and data usability
+                    - Consider prioritizing enrichment for columns with the lowest completeness rates
+                    """)
+            
+            # Date Quality Tab
+            with quality_dashboard_tabs[2]:
+                if 'date_quality' in quality_results['figures']:
+                    st.plotly_chart(quality_results['figures']['date_quality'], use_container_width=True)
+                    
+                    if 'date_quality' in quality_results['tables']:
+                        date_df = quality_results['tables']['date_quality']
+                        st.dataframe(date_df.sort_values('percent_valid'), use_container_width=True)
+                        
+                        st.markdown("""
+                        **Date Field Importance:**
+                        - Course version and availability dates are critical for timeline analysis
+                        - Invalid dates can lead to incorrect filtering and reporting
+                        - Discontinuation dates determine course lifecycle metrics
+                        """)
+            
+            # Cross-References Tab
+            with quality_dashboard_tabs[3]:
+                if 'sources' in quality_results['figures']:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.plotly_chart(quality_results['figures']['sources'])
+                    with col2:
+                        if 'cross_references' in quality_results['figures']:
+                            st.plotly_chart(quality_results['figures']['cross_references'])
+                
+                if 'verified_data' in quality_results['metrics']:
+                    metrics = quality_results['metrics']['verified_data']
+                    st.markdown(f"""
+                    **Cross-Reference Analysis:**
+                    - {metrics['multi_source']:,} records ({metrics['percent_verified']}%) are verified across multiple sources
+                    - {metrics['single_source']:,} records appear in only one data source
+                    - Cross-referenced data is generally more reliable and complete
+                    """)
+            
+            # Issues Summary Tab
+            with quality_dashboard_tabs[4]:
+                if 'issues' in quality_results['tables']:
+                    issues_df = quality_results['tables']['issues']
+                    
+                    st.markdown("### Critical Data Issues")
+                    st.dataframe(issues_df, use_container_width=True)
+                    
+                    # Generate recommendations
+                    st.markdown("### Recommendations")
+                    recommendations = []
+                    
+                    # Check for missing critical data
+                    missing_critical = issues_df[issues_df['issue_type'] == 'Missing Data']
+                    if not missing_critical.empty:
+                        recommendations.append("**Priority 1:** Fill in missing values for critical fields, especially course titles and IDs.")
+                    
+                    # Check for date issues
+                    date_issues = issues_df[issues_df['issue_type'] == 'Invalid Date']
+                    if not date_issues.empty:
+                        recommendations.append("**Priority 2:** Fix invalid dates to enable proper timeline and lifecycle analysis.")
+                    
+                    # Check cross-references
+                    ref_issues = issues_df[issues_df['issue_type'] == 'No Cross-References']
+                    if not ref_issues.empty:
+                        recommendations.append("**Priority 3:** Improve data verification by finding matching records across sources.")
+                    
+                    for rec in recommendations:
+                        st.markdown(rec)
+                    
+                    # Export option
+                    csv = issues_df.to_csv(index=False)
+                    st.download_button(
+                        "Download Issues Report",
+                        csv,
+                        "data_quality_issues.csv",
+                        "text/csv"
+                    )
             
             # Navigation
             st.header("🔍 Analysis Sections")

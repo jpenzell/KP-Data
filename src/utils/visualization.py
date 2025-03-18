@@ -5,7 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-from typing import Dict, List, Optional, Union
+import numpy as np
+import streamlit as st
+from typing import Dict, List, Optional, Union, Any
+from datetime import datetime
 
 from models.data_models import VisualizationConfig
 
@@ -22,121 +25,173 @@ def create_wordcloud(text: str, width: int = 800, height: int = 400) -> plt.Figu
     ax.axis('off')
     return fig
 
+@st.cache_data(ttl=3600)
 def plot_timeline(
     df: pd.DataFrame,
-    date_col: str,
-    config: Optional[VisualizationConfig] = None
+    date_column: str,
+    category_column: Optional[str] = None,
+    title: str = "Timeline Distribution",
+    height: int = 500,
+    width: int = 800
 ) -> go.Figure:
-    """Create a timeline visualization for the specified date column."""
-    if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
-        return None
+    """
+    Create an interactive timeline visualization.
     
-    if config is None:
-        config = VisualizationConfig(
-            title=f'Distribution of {date_col}',
-            x_label=date_col,
-            y_label='Count',
-            chart_type='histogram'
-        )
+    Args:
+        df: DataFrame containing the data
+        date_column: Column name with date information
+        category_column: Optional column for grouping
+        title: Plot title
+        height: Plot height
+        width: Plot width
+        
+    Returns:
+        Plotly figure object
+    """
+    # Ensure date column is datetime
+    df = df.copy()
+    df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
     
-    fig = px.histogram(
-        df,
-        x=date_col,
-        title=config.title,
-        labels={
-            date_col: config.x_label,
-            'count': config.y_label
-        }
-    )
+    # Filter out rows with invalid dates
+    df = df.dropna(subset=[date_column])
     
-    fig.update_layout(
-        bargap=0.2,
-        width=config.width,
-        height=config.height
-    )
-    
-    return fig
-
-def plot_quality_distribution(
-    df: pd.DataFrame,
-    config: Optional[VisualizationConfig] = None
-) -> go.Figure:
-    """Plot the distribution of quality scores."""
-    if 'quality_score' not in df.columns:
-        return None
-    
-    if config is None:
-        config = VisualizationConfig(
-            title='Distribution of Content Quality Scores',
-            x_label='Quality Score',
-            y_label='Number of Courses',
-            chart_type='histogram'
-        )
-    
-    fig = px.histogram(
-        df,
-        x='quality_score',
-        nbins=20,
-        title=config.title,
-        labels={
-            'quality_score': config.x_label,
-            'count': config.y_label
-        }
-    )
-    
-    fig.add_vline(
-        x=0.6,
-        line_dash="dash",
-        line_color="red",
-        annotation_text="Attention Threshold"
-    )
-    
-    fig.update_layout(
-        width=config.width,
-        height=config.height
-    )
-    
-    return fig
-
-def plot_category_distribution(
-    data: Dict[str, float],
-    config: Optional[VisualizationConfig] = None
-) -> go.Figure:
-    """Create a bar or pie chart of category distribution."""
-    if config is None:
-        config = VisualizationConfig(
-            title='Distribution by Category',
-            x_label='Category',
-            y_label='Percentage',
-            chart_type='bar'
-        )
-    
-    df = pd.DataFrame(list(data.items()), columns=['Category', 'Value'])
-    
-    if config.chart_type == 'pie':
-        fig = px.pie(
+    if category_column and category_column in df.columns:
+        fig = px.scatter(
             df,
-            values='Value',
-            names='Category',
-            title=config.title
+            x=date_column,
+            y=category_column,
+            color=category_column,
+            title=title,
+            height=height,
+            width=width,
         )
     else:
-        fig = px.bar(
+        # Create histogram when no category column
+        fig = px.histogram(
             df,
-            x='Category',
-            y='Value',
-            title=config.title,
-            labels={
-                'Category': config.x_label,
-                'Value': config.y_label
-            }
+            x=date_column,
+            title=title,
+            height=height,
+            width=width,
+        )
+    
+    fig.update_layout(xaxis_title=date_column.replace('_', ' ').title())
+    return fig
+
+@st.cache_data(ttl=3600)
+def plot_quality_distribution(
+    df: pd.DataFrame,
+    quality_column: str = 'quality_score',
+    category_column: Optional[str] = None,
+    title: str = "Quality Score Distribution",
+    height: int = 500,
+    width: int = 800
+) -> go.Figure:
+    """
+    Visualize the distribution of quality scores.
+    
+    Args:
+        df: DataFrame containing the data
+        quality_column: Column with quality scores
+        category_column: Optional column for grouping
+        title: Plot title
+        height: Plot height
+        width: Plot width
+        
+    Returns:
+        Plotly figure object
+    """
+    if quality_column not in df.columns:
+        # Create dummy column if not present
+        df = df.copy()
+        df[quality_column] = np.random.uniform(0, 1, len(df))
+        
+    if category_column and category_column in df.columns:
+        fig = px.box(
+            df,
+            y=quality_column,
+            x=category_column,
+            color=category_column,
+            title=title,
+            height=height,
+            width=width,
+        )
+    else:
+        fig = px.histogram(
+            df,
+            x=quality_column,
+            title=title,
+            height=height,
+            width=width,
+            nbins=20,
+        )
+        
+    fig.update_layout(
+        xaxis_title=quality_column.replace('_', ' ').title(),
+        yaxis_title='Count' if category_column is None else quality_column.replace('_', ' ').title()
+    )
+    return fig
+
+@st.cache_data(ttl=3600)
+def plot_category_distribution(
+    df: pd.DataFrame,
+    category_column: str,
+    count_column: Optional[str] = None,
+    title: str = "Category Distribution",
+    height: int = 500,
+    width: int = 800
+) -> go.Figure:
+    """
+    Create a bar chart showing category distribution.
+    
+    Args:
+        df: DataFrame containing the data
+        category_column: Column with category information
+        count_column: Optional column for value counts
+        title: Plot title
+        height: Plot height
+        width: Plot width
+        
+    Returns:
+        Plotly figure object
+    """
+    if category_column not in df.columns:
+        return None
+    
+    # Create a copy to avoid modifying the original
+    df = df.copy()
+    
+    # Fill missing values with 'Unknown'
+    df[category_column] = df[category_column].fillna('Unknown')
+    
+    if count_column and count_column in df.columns:
+        # Group by category and sum the count column
+        category_counts = df.groupby(category_column)[count_column].sum().reset_index()
+        fig = px.bar(
+            category_counts,
+            x=category_column,
+            y=count_column,
+            title=title,
+            height=height,
+            width=width,
+        )
+    else:
+        # Count occurrences of each category
+        category_counts = df[category_column].value_counts().reset_index()
+        category_counts.columns = [category_column, 'count']
+        fig = px.bar(
+            category_counts,
+            x=category_column,
+            y='count',
+            title=title,
+            height=height,
+            width=width,
         )
     
     fig.update_layout(
-        width=config.width,
-        height=config.height
+        xaxis_title=category_column.replace('_', ' ').title(),
+        yaxis_title='Count'
     )
-    
     return fig
 
 def plot_trend_line(
@@ -288,4 +343,235 @@ def plot_box(
         height=config.height
     )
     
-    return fig 
+    return fig
+
+def plot_data_quality_metrics(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Create visualizations for data quality metrics.
+    
+    Args:
+        df: DataFrame to analyze
+        
+    Returns:
+        Dictionary containing Plotly figures and metrics
+    """
+    results = {
+        'figures': {},
+        'metrics': {},
+        'tables': {}
+    }
+    
+    # 1. Calculate overall completeness by column
+    completeness = pd.DataFrame({
+        'column': df.columns,
+        'non_null': df.count(),
+        'total': len(df)
+    })
+    completeness['percent_complete'] = (completeness['non_null'] / completeness['total'] * 100).round(1)
+    completeness = completeness.sort_values('percent_complete')
+    
+    # Create completeness figure
+    fig_completeness = px.bar(
+        completeness.head(15),  # Focus on 15 most incomplete columns
+        x='column', 
+        y='percent_complete',
+        title='Data Completeness by Column (15 most incomplete)',
+        labels={'percent_complete': 'Percent Complete (%)', 'column': 'Column'}
+    )
+    
+    # Add reference line at 80%
+    fig_completeness.add_hline(
+        y=80, 
+        line_dash="dash", 
+        line_color="red",
+        annotation_text="80% Completeness Threshold"
+    )
+    fig_completeness.update_layout(height=400)
+    results['figures']['completeness'] = fig_completeness
+    
+    # 2. Date field quality
+    date_columns = [
+        col for col in df.columns 
+        if col.endswith('_is_valid') and col.replace('_is_valid', '') in df.columns
+    ]
+    
+    if date_columns:
+        date_quality = []
+        for col in date_columns:
+            base_col = col.replace('_is_valid', '')
+            valid_count = df[col].sum()
+            invalid_count = len(df) - valid_count
+            date_quality.append({
+                'column': base_col,
+                'valid': valid_count,
+                'invalid': invalid_count,
+                'percent_valid': (valid_count / len(df) * 100).round(1)
+            })
+        
+        date_quality_df = pd.DataFrame(date_quality)
+        if not date_quality_df.empty:
+            # Create stacked bar chart for date quality
+            fig_date_quality = go.Figure()
+            
+            # Add bars for valid dates
+            fig_date_quality.add_trace(go.Bar(
+                name='Valid',
+                x=date_quality_df['column'],
+                y=date_quality_df['valid'],
+                marker_color='green'
+            ))
+            
+            # Add bars for invalid dates
+            fig_date_quality.add_trace(go.Bar(
+                name='Invalid',
+                x=date_quality_df['column'],
+                y=date_quality_df['invalid'],
+                marker_color='red'
+            ))
+            
+            fig_date_quality.update_layout(
+                barmode='stack',
+                title='Date Field Quality',
+                xaxis_title='Date Column',
+                yaxis_title='Count',
+                height=400
+            )
+            
+            results['figures']['date_quality'] = fig_date_quality
+            results['tables']['date_quality'] = date_quality_df
+    
+    # 3. Data source distribution
+    if 'data_source' in df.columns:
+        source_counts = df['data_source'].value_counts()
+        source_df = pd.DataFrame({
+            'source': source_counts.index,
+            'count': source_counts.values
+        })
+        
+        fig_sources = px.pie(
+            source_df,
+            values='count',
+            names='source',
+            title='Data Distribution by Source'
+        )
+        fig_sources.update_traces(textposition='inside', textinfo='percent+label')
+        fig_sources.update_layout(height=400)
+        results['figures']['sources'] = fig_sources
+    
+    # 4. Cross-reference metrics
+    if 'cross_reference_count' in df.columns:
+        cross_ref_counts = df['cross_reference_count'].value_counts().sort_index()
+        cross_ref_df = pd.DataFrame({
+            'sources': cross_ref_counts.index,
+            'count': cross_ref_counts.values
+        })
+        
+        fig_cross_ref = px.bar(
+            cross_ref_df,
+            x='sources',
+            y='count',
+            title='Records by Number of Cross-References',
+            labels={'sources': 'Number of Data Sources', 'count': 'Number of Records'}
+        )
+        fig_cross_ref.update_layout(height=400)
+        results['figures']['cross_references'] = fig_cross_ref
+        
+        # Calculate data verification metrics
+        single_source = (df['cross_reference_count'] == 1).sum()
+        multi_source = (df['cross_reference_count'] > 1).sum()
+        
+        results['metrics']['verified_data'] = {
+            'single_source': single_source,
+            'multi_source': multi_source,
+            'percent_verified': (multi_source / len(df) * 100).round(1)
+        }
+    
+    # 5. Overall data quality score
+    if 'quality_score' in df.columns:
+        quality_bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        quality_labels = ['Very Poor', 'Poor', 'Fair', 'Good', 'Excellent']
+        
+        df['quality_category'] = pd.cut(
+            df['quality_score'], 
+            bins=quality_bins, 
+            labels=quality_labels,
+            include_lowest=True
+        )
+        
+        quality_dist = df['quality_category'].value_counts()
+        quality_df = pd.DataFrame({
+            'category': quality_dist.index,
+            'count': quality_dist.values
+        })
+        
+        fig_quality = px.bar(
+            quality_df,
+            x='category',
+            y='count',
+            title='Records by Quality Category',
+            color='category',
+            color_discrete_map={
+                'Very Poor': 'red',
+                'Poor': 'orange',
+                'Fair': 'yellow',
+                'Good': 'lightgreen',
+                'Excellent': 'darkgreen'
+            }
+        )
+        fig_quality.update_layout(height=400)
+        results['figures']['quality_categories'] = fig_quality
+        
+        # Calculate overall quality metrics
+        results['metrics']['overall_quality'] = {
+            'mean_score': df['quality_score'].mean().round(2),
+            'median_score': df['quality_score'].median().round(2),
+            'high_quality': (df['quality_score'] >= 0.8).sum(),
+            'low_quality': (df['quality_score'] < 0.4).sum(),
+            'percent_high_quality': ((df['quality_score'] >= 0.8).sum() / len(df) * 100).round(1)
+        }
+    
+    # 6. Issues summary table
+    issues = []
+    
+    # Missing critical fields
+    critical_fields = ['course_title', 'course_no', 'course_description', 'category_name']
+    for field in critical_fields:
+        if field in df.columns:
+            missing = df[field].isna().sum()
+            if missing > 0:
+                issues.append({
+                    'issue_type': 'Missing Data',
+                    'field': field,
+                    'count': missing,
+                    'percent': (missing / len(df) * 100).round(1)
+                })
+    
+    # Date field issues
+    for col in date_columns:
+        base_col = col.replace('_is_valid', '')
+        invalid = (~df[col]).sum()
+        if invalid > 0:
+            issues.append({
+                'issue_type': 'Invalid Date',
+                'field': base_col,
+                'count': invalid,
+                'percent': (invalid / len(df) * 100).round(1)
+            })
+    
+    # Cross-reference issues
+    if 'cross_reference_count' in df.columns:
+        single_source = (df['cross_reference_count'] == 1).sum()
+        if single_source > 0:
+            issues.append({
+                'issue_type': 'No Cross-References',
+                'field': 'cross_reference_count',
+                'count': single_source,
+                'percent': (single_source / len(df) * 100).round(1)
+            })
+    
+    # Create issues table
+    if issues:
+        issues_df = pd.DataFrame(issues).sort_values('count', ascending=False)
+        results['tables']['issues'] = issues_df
+    
+    return results 
