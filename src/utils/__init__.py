@@ -24,16 +24,37 @@ from .optimizations import (
     fix_row_count_discrepancy
 )
 
+# Import similarity analysis utilities
+from .similarity import (
+    compute_content_similarity,
+    find_potential_duplicates,
+    plot_similarity_network,
+    plot_department_similarity_heatmap,
+    generate_consolidation_recommendations,
+    analyze_content_similarity
+)
+
 __all__ = [
+    # Visualization
     'plot_quality_distribution', 
     'plot_timeline', 
     'create_wordcloud',
     'plot_data_quality_metrics',
+    
+    # Optimization
     'remove_unnamed_columns',
     'clean_column_names',
     'enhanced_date_repair',
     'process_in_chunks',
     'optimize_memory_usage_enhanced',
     'measure_execution_time',
-    'fix_row_count_discrepancy'
+    'fix_row_count_discrepancy',
+    
+    # Similarity Analysis
+    'compute_content_similarity',
+    'find_potential_duplicates',
+    'plot_similarity_network',
+    'plot_department_similarity_heatmap',
+    'generate_consolidation_recommendations',
+    'analyze_content_similarity'
 ] 

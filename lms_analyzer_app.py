@@ -1228,6 +1228,204 @@ def main():
             
             # Navigation
             st.header("🔍 Analysis Sections")
+            
+            # Content Similarity Analysis
+            st.subheader("📊 Content Similarity Analysis")
+            
+            st.markdown("""
+            This analysis identifies duplicate or highly similar courses across departments, 
+            helping you identify opportunities for content consolidation and collaboration.
+            """)
+            
+            # Run the content similarity analysis
+            from src.utils.similarity import analyze_content_similarity
+            
+            # Add loading state indicator
+            with st.spinner("Analyzing content similarity... This may take a minute for large datasets."):
+                # Execute the similarity analysis
+                similarity_results = analyze_content_similarity(combined_data)
+            
+            # Create tabs for different analysis views
+            similarity_tabs = st.tabs([
+                "Overview", 
+                "Similarity Network", 
+                "Department Overlap",
+                "Potential Duplicates",
+                "Consolidation Recommendations"
+            ])
+            
+            # Overview tab
+            with similarity_tabs[0]:
+                if 'metrics' in similarity_results and 'similarity_counts' in similarity_results['metrics']:
+                    metrics = similarity_results['metrics']['similarity_counts']
+                    
+                    # Display key metrics in columns
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Similar Pairs", f"{metrics['total_pairs']:,}")
+                    with col2:
+                        st.metric("High Similarity (≥80%)", f"{metrics['high_similarity']:,}")
+                    with col3:
+                        st.metric("Potential Duplicates", f"{metrics['potential_duplicates']:,}")
+                    
+                    # Display cross-department metrics if available
+                    if 'cross_department' in similarity_results['metrics']:
+                        cross_dept = similarity_results['metrics']['cross_department']
+                        st.metric(
+                            "Cross-Department Similarity", 
+                            f"{cross_dept['total_cross_dept_pairs']:,} pairs ({cross_dept['percent_cross_dept']:.1f}%)"
+                        )
+                    
+                    st.markdown("""
+                    ### Understanding the Results
+                    
+                    - **High Similarity (≥80%)**: These courses have significant content overlap and are candidates for consolidation
+                    - **Medium Similarity (60-80%)**: These courses have partial overlap and might benefit from coordination
+                    - **Cross-Department Similarity**: Identifies similar content across different departments
+                    
+                    Use the other tabs to explore detailed visualizations and specific recommendations.
+                    """)
+                else:
+                    st.info("No similarity data available. This could be due to insufficient text data in the courses.")
+            
+            # Similarity Network tab
+            with similarity_tabs[1]:
+                if 'figures' in similarity_results and 'similarity_network' in similarity_results['figures']:
+                    st.plotly_chart(similarity_results['figures']['similarity_network'], use_container_width=True)
+                    
+                    st.markdown("""
+                    **About the Network Visualization:**
+                    
+                    - Each node represents a course
+                    - Connected nodes have content similarity above the threshold
+                    - Larger nodes have more connections (similar to more courses)
+                    - Node color indicates number of connections (darker = more connections)
+                    - Hover over nodes and edges to see details
+                    
+                    Clusters in the network indicate groups of related courses that could be reviewed together.
+                    """)
+                else:
+                    st.info("No network visualization available. Try adjusting the similarity threshold.")
+            
+            # Department Overlap tab
+            with similarity_tabs[2]:
+                if 'figures' in similarity_results and 'department_similarity' in similarity_results['figures']:
+                    st.plotly_chart(similarity_results['figures']['department_similarity'], use_container_width=True)
+                    
+                    st.markdown("""
+                    **About the Department Heatmap:**
+                    
+                    - Colors represent the average similarity between departments
+                    - Darker colors indicate higher similarity between department content
+                    - The diagonal shows self-similarity (always 100%)
+                    
+                    High similarity between different departments indicates potential for collaboration
+                    or standardization of training content.
+                    """)
+                else:
+                    st.info("Department similarity data not available. This may be due to missing department information in the data.")
+            
+            # Potential Duplicates tab
+            with similarity_tabs[3]:
+                if 'tables' in similarity_results and 'potential_duplicates' in similarity_results['tables']:
+                    duplicates_df = similarity_results['tables']['potential_duplicates']
+                    
+                    # Show filtered version of the dataframe
+                    display_cols = ['title_1', 'title_2', 'similarity_score', 'category_1', 'category_2']
+                    
+                    # Add department columns if available
+                    if 'dept_1' in duplicates_df.columns:
+                        display_cols.extend(['dept_1', 'dept_2', 'is_cross_dept'])
+                    
+                    st.dataframe(
+                        duplicates_df[display_cols].sort_values('similarity_score', ascending=False),
+                        use_container_width=True
+                    )
+                    
+                    # Add download option
+                    csv = duplicates_df.to_csv(index=False)
+                    st.download_button(
+                        "Download Potential Duplicates Data",
+                        csv,
+                        "potential_duplicates.csv",
+                        "text/csv"
+                    )
+                    
+                    st.markdown("""
+                    **Interpreting Potential Duplicates:**
+                    
+                    The table above shows course pairs with high content similarity (≥80%). 
+                    These courses are candidates for review and potential consolidation.
+                    
+                    Prioritize cross-department duplicates, as these may indicate lack of coordination
+                    between different parts of the organization.
+                    """)
+                else:
+                    st.info("No potential duplicates identified in the dataset.")
+            
+            # Consolidation Recommendations tab
+            with similarity_tabs[4]:
+                if 'tables' in similarity_results and 'consolidation_recommendations' in similarity_results['tables']:
+                    recommendations_df = similarity_results['tables']['consolidation_recommendations']
+                    
+                    # Select columns for display
+                    display_cols = ['title_1', 'title_2', 'similarity_score', 'recommendation']
+                    
+                    # Add columns if available
+                    if 'learners_1' in recommendations_df.columns:
+                        display_cols.extend(['learners_1', 'learners_2', 'total_enrollment'])
+                    
+                    if 'potential_savings' in recommendations_df.columns:
+                        display_cols.append('potential_savings')
+                        display_cols.append('savings_impact')
+                    
+                    # Display recommendations
+                    st.dataframe(
+                        recommendations_df[display_cols].sort_values(
+                            'total_enrollment' if 'total_enrollment' in recommendations_df.columns else 'similarity_score', 
+                            ascending=False
+                        ),
+                        use_container_width=True
+                    )
+                    
+                    # Add download option
+                    csv = recommendations_df.to_csv(index=False)
+                    st.download_button(
+                        "Download Detailed Recommendations",
+                        csv,
+                        "consolidation_recommendations.csv",
+                        "text/csv"
+                    )
+                    
+                    # Summary of recommendations
+                    if 'potential_savings' in recommendations_df.columns:
+                        total_savings = recommendations_df['potential_savings'].sum()
+                        high_impact = (recommendations_df['savings_impact'] == 'High').sum()
+                        
+                        st.markdown(f"""
+                        ### Key Findings
+                        
+                        - **Total potential learner savings:** {total_savings:,} enrollments
+                        - **High-impact opportunities:** {high_impact} course pairs
+                        
+                        Consolidating these courses could reduce content management overhead,
+                        improve content quality, and simplify the learner experience.
+                        """)
+                    
+                    st.markdown("""
+                    **Implementation Strategy:**
+                    
+                    1. Start with high-impact, high-similarity courses
+                    2. For each pair, review the recommendation (typically keep the newer version)
+                    3. Create a migration plan for learners
+                    4. Archive the discontinued course after migration
+                    """)
+            
+            # Time Analysis
+            st.subheader("⏱️ Time Analysis")
+            
+            # Navigation
+            st.header("🔍 Analysis Sections")
             analysis_choice = st.radio(
                 "Select an analysis area to explore:",
                 ["Data Quality & Completeness",
