@@ -15,6 +15,7 @@ import networkx as nx
 from typing import Dict, List, Tuple, Any, Optional
 import re
 import streamlit as st
+import math
 
 @st.cache_data(ttl=3600)
 def preprocess_text(text: str) -> str:
@@ -45,8 +46,9 @@ def preprocess_text(text: str) -> str:
 @st.cache_data(ttl=3600)
 def compute_content_similarity(df: pd.DataFrame, 
                              text_columns: List[str] = ['course_title', 'course_description', 'course_abstract', 'course_keywords'], 
-                             min_similarity: float = 0.5,
-                             max_results: int = 1000) -> pd.DataFrame:
+                             min_similarity: float = 0.7,  # Increased from 0.5 to 0.7 for better performance
+                             max_results: int = 1000,
+                             use_progress_bar: bool = True) -> pd.DataFrame:
     """
     Compute similarity between courses based on text content.
     
@@ -55,14 +57,20 @@ def compute_content_similarity(df: pd.DataFrame,
         text_columns: List of columns to use for similarity calculation
         min_similarity: Minimum similarity threshold
         max_results: Maximum number of pairs to return
+        use_progress_bar: Whether to display a progress bar
         
     Returns:
         DataFrame with similar course pairs
     """
     print(f"Computing content similarity using columns: {text_columns}")
+    print(f"Using minimum similarity threshold: {min_similarity}")
     
     # Create a copy of the dataframe to avoid modifying the original
     df = df.copy()
+    
+    # Ensure course_id is string type to prevent comparison issues
+    if 'course_id' in df.columns:
+        df['course_id'] = df['course_id'].astype(str)
     
     # Prepare a combined text column for similarity analysis
     df['combined_text'] = ''
@@ -116,88 +124,142 @@ def compute_content_similarity(df: pd.DataFrame,
         return pd.DataFrame()
     
     # Compute cosine similarity
-    print("Computing cosine similarity")
+    print("Computing cosine similarity with optimized chunking")
     
-    # Process in chunks to avoid memory issues with large datasets
-    chunk_size = 1000
+    # More efficient chunking - smaller chunks and avoid redundant comparisons
+    chunk_size = 500  # Reduced from 1000 to 500 for better memory management
     similar_pairs = []
     
-    for i in range(0, len(df_valid), chunk_size):
-        end = min(i + chunk_size, len(df_valid))
-        chunk = tfidf_matrix[i:end]
+    try:
+        # Set up progress bar if requested
+        total_chunks = (len(df_valid) + chunk_size - 1) // chunk_size
+        total_comparisons = total_chunks * (total_chunks + 1) // 2  # Sum of 1 to n
         
-        # Compute similarity between this chunk and all other courses
-        chunk_sim = cosine_similarity(chunk, tfidf_matrix)
+        if use_progress_bar:
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+            progress_count = 0
         
-        # Extract similar pairs
-        for j in range(chunk_sim.shape[0]):
-            course_idx = i + j
-            course_id = df_valid.iloc[course_idx]['course_id']
+        for i in range(0, len(df_valid), chunk_size):
+            i_end = min(i + chunk_size, len(df_valid))
+            chunk_i = tfidf_matrix[i:i_end]
             
-            # Get indices of similar courses (excluding self)
-            similar_indices = np.where(chunk_sim[j] >= min_similarity)[0]
+            # Only compute similarities with chunks j where j >= i to avoid redundancy
+            for j in range(i, len(df_valid), chunk_size):
+                j_end = min(j + chunk_size, len(df_valid))
+                chunk_j = tfidf_matrix[j:j_end]
+                
+                # Update progress
+                if use_progress_bar:
+                    progress_count += 1
+                    progress_bar.progress(progress_count / total_comparisons)
+                    status_text.text(f"Comparing chunk {progress_count}/{total_comparisons}...")
+                
+                # Compute similarity between chunks
+                chunk_sim = cosine_similarity(chunk_i, chunk_j)
+                
+                # Extract similar pairs
+                for row_idx in range(chunk_sim.shape[0]):
+                    course_i_idx = i + row_idx
+                    course_i_id = df_valid.iloc[course_i_idx]['course_id']
+                    
+                    # Get column indices of similar courses
+                    # Only look at upper triangular part when i==j to avoid duplicates
+                    start_col = row_idx + 1 if i == j else 0
+                    
+                    for col_idx in range(start_col, chunk_sim.shape[1]):
+                        similarity = chunk_sim[row_idx, col_idx]
+                        
+                        # Skip if below threshold
+                        if similarity < min_similarity:
+                            continue
+                            
+                        course_j_idx = j + col_idx
+                        
+                        # Skip self-similarity
+                        if course_i_idx == course_j_idx:
+                            continue
+                            
+                        course_j_id = df_valid.iloc[course_j_idx]['course_id']
+                        
+                        # Add to similar pairs
+                        similar_pairs.append((
+                            str(course_i_id), 
+                            str(course_j_id), 
+                            float(similarity)
+                        ))
+        
+        # Clear progress
+        if use_progress_bar:
+            status_text.empty()
+            progress_bar.empty()
             
-            for sim_idx in similar_indices:
-                # Skip self-similarity
-                if sim_idx == course_idx:
-                    continue
-                
-                sim_id = df_valid.iloc[sim_idx]['course_id']
-                similarity = chunk_sim[j, sim_idx]
-                
-                # Only include pairs where first ID < second ID to avoid duplicates
-                if course_id < sim_id:
-                    similar_pairs.append((course_id, sim_id, similarity))
+    except Exception as e:
+        print(f"Error computing content similarity: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if use_progress_bar:
+            st.error(f"Error during similarity computation: {str(e)}")
+        return pd.DataFrame()
     
     # Create DataFrame from pairs
     if similar_pairs:
-        similar_df = pd.DataFrame(similar_pairs, columns=['course_id_1', 'course_id_2', 'similarity_score'])
-        
-        # Sort by similarity score (highest first)
-        similar_df = similar_df.sort_values('similarity_score', ascending=False)
-        
-        # Limit number of results
-        similar_df = similar_df.head(max_results)
-        
-        # Add titles and other metadata for easier interpretation
-        id_to_title = df.set_index('course_id')['course_title'].astype(str).to_dict()
-        
-        # Handle category_name which might be categorical
-        if 'category_name' in df.columns:
-            if pd.api.types.is_categorical_dtype(df['category_name']):
-                id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
-            else:
-                id_to_category = df.set_index('course_id')['category_name'].to_dict()
-        else:
-            id_to_category = {}
-        
-        # Handle sponsoring_dept which might be categorical
-        if 'sponsoring_dept' in df.columns:
-            if pd.api.types.is_categorical_dtype(df['sponsoring_dept']):
-                id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
-            else:
-                id_to_dept = df.set_index('course_id')['sponsoring_dept'].to_dict()
-        else:
-            id_to_dept = {}
-        
-        similar_df['title_1'] = similar_df['course_id_1'].map(id_to_title)
-        similar_df['title_2'] = similar_df['course_id_2'].map(id_to_title)
-        
-        if id_to_category:
-            similar_df['category_1'] = similar_df['course_id_1'].map(id_to_category)
-            similar_df['category_2'] = similar_df['course_id_2'].map(id_to_category)
-        
-        if id_to_dept:
-            similar_df['dept_1'] = similar_df['course_id_1'].map(id_to_dept)
-            similar_df['dept_2'] = similar_df['course_id_2'].map(id_to_dept)
+        try:
+            print(f"Found {len(similar_pairs)} similar pairs. Creating similarity DataFrame...")
+            similar_df = pd.DataFrame(similar_pairs, columns=['course_id_1', 'course_id_2', 'similarity_score'])
             
-            # Add flag for cross-department similarity
-            similar_df['is_cross_dept'] = (similar_df['dept_1'] != similar_df['dept_2']) & \
-                                         (~similar_df['dept_1'].isna()) & \
-                                         (~similar_df['dept_2'].isna())
-        
-        print(f"Found {len(similar_df)} similar course pairs with similarity ≥ {min_similarity}")
-        return similar_df
+            # Sort by similarity score (highest first)
+            similar_df = similar_df.sort_values('similarity_score', ascending=False)
+            
+            # Limit number of results
+            similar_df = similar_df.head(max_results)
+            
+            # Add titles and other metadata for easier interpretation
+            print("Adding metadata to similarity pairs...")
+            id_to_title = df.set_index('course_id')['course_title'].astype(str).to_dict()
+            
+            # Handle category_name which might be categorical
+            if 'category_name' in df.columns:
+                if pd.api.types.is_categorical_dtype(df['category_name']):
+                    id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
+                else:
+                    id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
+            else:
+                id_to_category = {}
+            
+            # Handle sponsoring_dept which might be categorical
+            if 'sponsoring_dept' in df.columns:
+                if pd.api.types.is_categorical_dtype(df['sponsoring_dept']):
+                    id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
+                else:
+                    id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
+            else:
+                id_to_dept = {}
+            
+            # Map values safely
+            similar_df['title_1'] = similar_df['course_id_1'].map(lambda x: id_to_title.get(x, "Unknown"))
+            similar_df['title_2'] = similar_df['course_id_2'].map(lambda x: id_to_title.get(x, "Unknown"))
+            
+            if id_to_category:
+                similar_df['category_1'] = similar_df['course_id_1'].map(lambda x: id_to_category.get(x, "Unknown"))
+                similar_df['category_2'] = similar_df['course_id_2'].map(lambda x: id_to_category.get(x, "Unknown"))
+            
+            if id_to_dept:
+                similar_df['dept_1'] = similar_df['course_id_1'].map(lambda x: id_to_dept.get(x, "Unknown"))
+                similar_df['dept_2'] = similar_df['course_id_2'].map(lambda x: id_to_dept.get(x, "Unknown"))
+                
+                # Add flag for cross-department similarity - ensure string comparison
+                similar_df['is_cross_dept'] = (similar_df['dept_1'] != similar_df['dept_2']) & \
+                                             (~similar_df['dept_1'].isna()) & \
+                                             (~similar_df['dept_2'].isna())
+            
+            print(f"Found {len(similar_df)} similar course pairs with similarity ≥ {min_similarity}")
+            return similar_df
+        except Exception as e:
+            print(f"Error creating similarity DataFrame: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return pd.DataFrame()
     else:
         print("No similar course pairs found")
         return pd.DataFrame()
@@ -217,6 +279,10 @@ def find_potential_duplicates(similarity_df: pd.DataFrame,
     if similarity_df.empty:
         return pd.DataFrame()
     
+    # Ensure similarity_score is float type
+    similarity_df = similarity_df.copy()
+    similarity_df['similarity_score'] = similarity_df['similarity_score'].astype(float)
+    
     # Filter for high similarity scores
     duplicates = similarity_df[similarity_df['similarity_score'] >= high_threshold].copy()
     
@@ -234,151 +300,180 @@ def find_potential_duplicates(similarity_df: pd.DataFrame,
     return duplicates
 
 def plot_similarity_network(similarity_df: pd.DataFrame, 
-                          min_threshold: float = 0.7,
-                          max_nodes: int = 100) -> go.Figure:
+                          min_nodes: int = 5, 
+                          max_nodes: int = 50,
+                          min_edge_weight: float = 0.6) -> go.Figure:
     """
-    Create a network visualization of course similarity.
+    Create a network visualization of course similarities.
     
     Args:
         similarity_df: DataFrame with similarity data
-        min_threshold: Minimum similarity threshold for visualization
-        max_nodes: Maximum number of nodes to include
+        min_nodes: Minimum number of nodes to include
+        max_nodes: Maximum number of nodes to show
+        min_edge_weight: Minimum edge weight (similarity) to include
         
     Returns:
-        Plotly figure with network graph
+        Plotly figure with network visualization
     """
     if similarity_df.empty:
         # Return empty figure if no data
         return go.Figure()
     
-    # Filter by threshold
-    filtered_df = similarity_df[similarity_df['similarity_score'] >= min_threshold].copy()
-    
-    if filtered_df.empty:
-        return go.Figure()
-    
-    # Create a graph
-    G = nx.Graph()
-    
-    # Add edges with similarity as weight
-    for _, row in filtered_df.iterrows():
-        G.add_edge(
-            row['course_id_1'], 
-            row['course_id_2'], 
-            weight=row['similarity_score'],
-            title1=row['title_1'],
-            title2=row['title_2']
+    try:
+        # Create a copy to avoid modifying the original
+        similarity_df = similarity_df.copy()
+        
+        # Ensure similarity_score is float
+        similarity_df['similarity_score'] = similarity_df['similarity_score'].astype(float)
+        
+        # Filter by minimum edge weight
+        filtered_df = similarity_df[similarity_df['similarity_score'] >= min_edge_weight].copy()
+        
+        if filtered_df.empty:
+            # If no edges meet criteria, lower the threshold
+            min_edge_weight = similarity_df['similarity_score'].min()
+            filtered_df = similarity_df.copy()
+        
+        # Get unique nodes (courses)
+        course_ids = set()
+        for col in ['course_id_1', 'course_id_2']:
+            course_ids.update(filtered_df[col].astype(str).unique())
+        
+        # Count connections for each node
+        node_connections = {}
+        for node in course_ids:
+            node_connections[node] = (
+                (filtered_df['course_id_1'] == node).sum() + 
+                (filtered_df['course_id_2'] == node).sum()
+            )
+        
+        # Sort nodes by connection count
+        sorted_nodes = sorted(node_connections.items(), key=lambda x: x[1], reverse=True)
+        
+        # Limit to max_nodes, but ensure at least min_nodes
+        if len(sorted_nodes) > max_nodes:
+            top_nodes = [node for node, _ in sorted_nodes[:max_nodes]]
+        else:
+            top_nodes = [node for node, _ in sorted_nodes]
+        
+        # Filter edges to only include top nodes
+        filtered_edges = filtered_df[
+            (filtered_df['course_id_1'].isin(top_nodes)) & 
+            (filtered_df['course_id_2'].isin(top_nodes))
+        ].copy()
+        
+        # If we have title information, use it for node labels
+        node_labels = {}
+        if 'title_1' in filtered_edges.columns:
+            # Create id to title mapping
+            for i, row in filtered_edges.iterrows():
+                node_labels[str(row['course_id_1'])] = str(row['title_1'])
+                node_labels[str(row['course_id_2'])] = str(row['title_2'])
+        else:
+            # Use IDs as labels
+            node_labels = {node: node for node in top_nodes}
+        
+        # Extract node and edge data
+        G = nx.Graph()
+        
+        # Add nodes
+        for node in top_nodes:
+            G.add_node(str(node), name=node_labels.get(str(node), str(node)))
+        
+        # Add edges
+        for _, row in filtered_edges.iterrows():
+            G.add_edge(
+                str(row['course_id_1']), 
+                str(row['course_id_2']), 
+                weight=float(row['similarity_score'])
+            )
+        
+        # Calculate node positions
+        pos = nx.spring_layout(G, k=1/math.sqrt(len(G.nodes())), iterations=50)
+        
+        # Create edge traces
+        edge_trace = []
+        
+        # Create edges with varying widths based on weight
+        for edge in G.edges(data=True):
+            x0, y0 = pos[edge[0]]
+            x1, y1 = pos[edge[1]]
+            weight = edge[2].get('weight', 0.5)
+            
+            # Scale line width based on similarity
+            width = 2 + 8 * (weight - min_edge_weight) / (1 - min_edge_weight)
+            
+            # Color scale based on weight
+            color = f'rgba({int(255 * (1 - weight))}, {int(255 * weight)}, 120, 0.7)'
+            
+            edge_trace.append(
+                go.Scatter(
+                    x=[x0, x1, None],
+                    y=[y0, y1, None],
+                    line=dict(width=width, color=color),
+                    hoverinfo='none',
+                    mode='lines'
+                )
+            )
+        
+        # Create node trace
+        node_x = []
+        node_y = []
+        node_text = []
+        node_size = []
+        
+        for node in G.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            node_text.append(G.nodes[node]['name'])
+            
+            # Size node based on degree
+            degree = G.degree(node)
+            node_size.append(10 + 5 * degree)
+        
+        node_trace = go.Scatter(
+            x=node_x,
+            y=node_y,
+            text=node_text,
+            mode='markers',
+            hoverinfo='text',
+            marker=dict(
+                showscale=True,
+                colorscale='YlGnBu',
+                size=node_size,
+                color=[G.degree(node) for node in G.nodes()],
+                colorbar=dict(
+                    thickness=15,
+                    title='Node Connections',
+                    xanchor='left',
+                    titleside='right'
+                ),
+                line=dict(width=2)
+            )
         )
-    
-    # Limit to largest connected component if too many nodes
-    if len(G.nodes) > max_nodes:
-        largest_cc = max(nx.connected_components(G), key=len)
-        G = G.subgraph(largest_cc).copy()
-    
-    # Still limit to max_nodes if needed
-    if len(G.nodes) > max_nodes:
-        # Calculate node importance (degree centrality)
-        centrality = nx.degree_centrality(G)
-        # Sort nodes by centrality
-        important_nodes = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:max_nodes]
-        # Create subgraph with important nodes
-        G = G.subgraph([node for node, _ in important_nodes]).copy()
-    
-    # Calculate layout
-    pos = nx.spring_layout(G, seed=42)
-    
-    # Create edge trace
-    edge_x = []
-    edge_y = []
-    edge_text = []
-    
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
         
-        # Add edge attributes to hover text
-        similarity = G.edges[edge]['weight']
-        title1 = G.edges[edge]['title1']
-        title2 = G.edges[edge]['title2']
-        edge_text.append(f"Similarity: {similarity:.2f}<br>{title1} - {title2}")
-    
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
-        hoverinfo='text',
-        mode='lines',
-        text=edge_text
-    )
-    
-    # Create node trace
-    node_x = []
-    node_y = []
-    node_text = []
-    node_size = []
-    
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
+        # Create figure
+        fig = go.Figure(
+            data=edge_trace + [node_trace],
+            layout=go.Layout(
+                title=f'Course Similarity Network (Similarity ≥ {min_edge_weight:.2f})',
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20, l=5, r=5, t=40),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                height=600
+            )
+        )
         
-        # Get node's titles from connected edges
-        titles = set()
-        for edge in G.edges(node):
-            if edge[0] == node:
-                titles.add(G.edges[edge]['title1'])
-            else:
-                titles.add(G.edges[edge]['title2'])
-        
-        # Use first title found
-        title = list(titles)[0] if titles else "Unknown"
-        node_text.append(f"ID: {node}<br>Title: {title}")
-        
-        # Node size based on degree
-        node_size.append(5 + 3 * G.degree[node])
+        return fig
     
-    node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers',
-        hoverinfo='text',
-        marker=dict(
-            showscale=True,
-            colorscale='YlGnBu',
-            reversescale=True,
-            color=[],
-            size=node_size,
-            colorbar=dict(
-                thickness=15,
-                title='Node Connections',
-                xanchor='left',
-                titleside='right'
-            ),
-            line_width=2
-        ),
-        text=node_text
-    )
-    
-    # Color node points by the number of connections
-    node_adjacencies = []
-    for node in G.nodes():
-        node_adjacencies.append(len(list(G.neighbors(node))))
-    
-    node_trace.marker.color = node_adjacencies
-    
-    # Create figure
-    fig = go.Figure(data=[edge_trace, node_trace],
-                  layout=go.Layout(
-                      title=f'Course Similarity Network (Similarity ≥ {min_threshold:.1f})',
-                      titlefont_size=16,
-                      showlegend=False,
-                      hovermode='closest',
-                      margin=dict(b=20, l=5, r=5, t=40),
-                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
-                  ))
-    
-    return fig
+    except Exception as e:
+        print(f"Error creating similarity network visualization: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return go.Figure()
 
 def plot_department_similarity_heatmap(similarity_df: pd.DataFrame) -> go.Figure:
     """
@@ -455,76 +550,82 @@ def generate_consolidation_recommendations(similarity_df: pd.DataFrame,
     if similarity_df.empty:
         return pd.DataFrame()
     
-    # Create a copy of the dataframe to avoid modifying the original
+    # Create a copy of the dataframes to avoid modifying the originals
+    similarity_df = similarity_df.copy()
     df = df.copy()
     
-    # Convert any categorical columns to string to avoid issues
+    # Ensure course_id is string type
+    if 'course_id' in df.columns:
+        df['course_id'] = df['course_id'].astype(str)
+    
+    # Ensure similarity_score is float
+    similarity_df['similarity_score'] = similarity_df['similarity_score'].astype(float)
+    
+    # Convert all categorical columns to string
     for col in df.columns:
         if pd.api.types.is_categorical_dtype(df[col]):
             df[col] = df[col].astype(str)
     
     # Identify potential duplicates
-    duplicates = find_potential_duplicates(similarity_df, high_threshold)
-    
-    if duplicates.empty:
-        return pd.DataFrame()
-    
-    # Get more context for better recommendations
-    if 'course_version' in df.columns and 'course_available_from' in df.columns:
-        # Map creation dates
-        id_to_date = df.set_index('course_id')['course_available_from'].to_dict()
-        id_to_version = df.set_index('course_id')['course_version'].to_dict()
+    try:
+        duplicates = find_potential_duplicates(similarity_df, high_threshold)
         
-        duplicates['date_1'] = duplicates['course_id_1'].map(id_to_date)
-        duplicates['date_2'] = duplicates['course_id_2'].map(id_to_date)
-        duplicates['version_1'] = duplicates['course_id_1'].map(id_to_version)
-        duplicates['version_2'] = duplicates['course_id_2'].map(id_to_version)
-        
-        # Determine which course is newer
-        duplicates['newer_course'] = duplicates.apply(
-            lambda x: x['course_id_1'] if x['date_1'] > x['date_2'] else x['course_id_2']
-            if not pd.isna(x['date_1']) and not pd.isna(x['date_2']) else 'Unknown',
-            axis=1
-        )
-        
-        # Refine recommendations based on dates
-        duplicates['recommendation'] = duplicates.apply(
-            lambda x: f"Keep {x['title_1'] if x['newer_course'] == x['course_id_1'] else x['title_2']} (newer)"
-            if x['newer_course'] != 'Unknown' else 'Review both for consolidation',
-            axis=1
-        )
-    
-    # Get learner count if available
-    if 'learner_count' in df.columns:
-        id_to_learners = df.set_index('course_id')['learner_count'].to_dict()
-        duplicates['learners_1'] = duplicates['course_id_1'].map(id_to_learners)
-        duplicates['learners_2'] = duplicates['course_id_2'].map(id_to_learners)
-        
-        # Consider high-enrollment courses in recommendations
-        mask = (~duplicates['learners_1'].isna()) & (~duplicates['learners_2'].isna())
-        if mask.any():
-            duplicates.loc[mask, 'total_enrollment'] = duplicates.loc[mask, 'learners_1'] + duplicates.loc[mask, 'learners_2']
+        if duplicates.empty:
+            return pd.DataFrame()
             
-            # Prioritize high-enrollment duplicates
-            duplicates = duplicates.sort_values('total_enrollment', ascending=False)
-    else:
-        # If no enrollment data, sort by similarity
-        duplicates = duplicates.sort_values('similarity_score', ascending=False)
-    
-    # Limit to max recommendations
-    duplicates = duplicates.head(max_recommendations)
-    
-    # Calculate potential savings
-    if 'learners_1' in duplicates.columns and 'learners_2' in duplicates.columns:
-        duplicates['potential_savings'] = duplicates.apply(
-            lambda x: min(x['learners_1'], x['learners_2']) if not pd.isna(x['learners_1']) and not pd.isna(x['learners_2']) else 0,
-            axis=1
-        )
-        duplicates['savings_impact'] = duplicates['potential_savings'].map(
-            lambda x: 'High' if x > 100 else ('Medium' if x > 50 else 'Low')
-        )
-    
-    return duplicates
+        # Prepare recommendations dataframe
+        recommendations = duplicates.copy()
+        
+        # Add more metadata to help with decision making
+        if 'total_2024_activity' in df.columns:
+            # Create dictionaries mapping course IDs to activity
+            id_to_activity = df.set_index('course_id')['total_2024_activity'].fillna(0).to_dict()
+            
+            # Add activity data for both courses in each pair
+            recommendations['activity_1'] = recommendations['course_id_1'].map(
+                lambda x: id_to_activity.get(x, 0)
+            )
+            recommendations['activity_2'] = recommendations['course_id_2'].map(
+                lambda x: id_to_activity.get(x, 0)
+            )
+            
+            # Calculate activity difference and recommend keeping the more active course
+            recommendations['activity_diff'] = recommendations['activity_1'] - recommendations['activity_2']
+            recommendations['keep_course'] = recommendations.apply(
+                lambda row: str(row['course_id_1']) if row['activity_1'] >= row['activity_2'] else str(row['course_id_2']),
+                axis=1
+            )
+            recommendations['consolidate_course'] = recommendations.apply(
+                lambda row: str(row['course_id_2']) if row['activity_1'] >= row['activity_2'] else str(row['course_id_1']),
+                axis=1
+            )
+        else:
+            # If no activity data, just make a placeholder recommendation
+            recommendations['keep_course'] = recommendations['course_id_1']
+            recommendations['consolidate_course'] = recommendations['course_id_2']
+        
+        # Add specific recommendation reasoning
+        if 'is_cross_dept' in recommendations.columns:
+            # Different recommendations for cross-department duplicates
+            cross_dept_mask = recommendations['is_cross_dept']
+            recommendations.loc[cross_dept_mask, 'recommendation_detail'] = 'Cross-department content overlap - consider collaboration'
+            recommendations.loc[~cross_dept_mask, 'recommendation_detail'] = 'Content duplicate - consider consolidation'
+        else:
+            recommendations['recommendation_detail'] = 'Similar content - consider consolidation'
+        
+        # Sort by similarity score (highest first)
+        recommendations = recommendations.sort_values('similarity_score', ascending=False)
+        
+        # Limit number of recommendations
+        recommendations = recommendations.head(max_recommendations)
+        
+        return recommendations
+        
+    except Exception as e:
+        print(f"Error generating consolidation recommendations: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
 
 def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
     """
@@ -551,11 +652,79 @@ def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
         print("Missing required columns for content similarity analysis")
         return results
     
+    # Ensure course_id is string type to prevent comparison issues
+    if 'course_id' in df.columns:
+        df['course_id'] = df['course_id'].astype(str)
+    
+    # Convert any categorical columns to string
+    for col in df.columns:
+        if pd.api.types.is_categorical_dtype(df[col]):
+            print(f"Converting categorical column {col} to string in analysis function")
+            df[col] = df[col].astype(str)
+    
+    # Sample large datasets to improve performance
+    dataset_size = len(df)
+    max_sample_size = 10000  # Maximum courses to analyze for performance
+    
+    if dataset_size > max_sample_size:
+        st.warning(f"""
+        Large dataset detected ({dataset_size:,} courses). 
+        Sampling {max_sample_size:,} courses for similarity analysis to improve performance.
+        To analyze all courses, please reduce the dataset size with filters first.
+        """)
+        
+        # Try to take a stratified sample by department or category if available
+        try:
+            if 'sponsoring_dept' in df.columns and df['sponsoring_dept'].nunique() > 1:
+                print(f"Taking stratified sample by department from {dataset_size} courses")
+                # Get departments with largest number of courses
+                top_depts = df['sponsoring_dept'].value_counts().nlargest(20).index
+                dept_sample = df[df['sponsoring_dept'].isin(top_depts)]
+                
+                if len(dept_sample) > max_sample_size // 2:
+                    # Sample from each department
+                    sampled_df = dept_sample.groupby('sponsoring_dept', group_keys=False).apply(
+                        lambda x: x.sample(min(max(50, max_sample_size // len(top_depts)), len(x)))
+                    )
+                    # Add some random courses to ensure diversity
+                    remaining = df[~df.index.isin(sampled_df.index)]
+                    if len(remaining) > 0 and len(sampled_df) < max_sample_size:
+                        random_sample = remaining.sample(min(max_sample_size - len(sampled_df), len(remaining)))
+                        sampled_df = pd.concat([sampled_df, random_sample])
+                else:
+                    # If the total is small, just use the top departments
+                    sampled_df = dept_sample
+            elif 'category_name' in df.columns and df['category_name'].nunique() > 1:
+                print(f"Taking stratified sample by category from {dataset_size} courses")
+                # Sample by category
+                sampled_df = df.groupby('category_name', group_keys=False).apply(
+                    lambda x: x.sample(min(max(50, max_sample_size // df['category_name'].nunique()), len(x)))
+                )
+                # Ensure we have at most max_sample_size
+                if len(sampled_df) > max_sample_size:
+                    sampled_df = sampled_df.sample(max_sample_size)
+            else:
+                # Random sample if no stratification column
+                print(f"Taking random sample from {dataset_size} courses")
+                sampled_df = df.sample(max_sample_size)
+            
+            print(f"Analyzing a sample of {len(sampled_df)} courses for similarity")
+        except Exception as e:
+            print(f"Error during sampling: {str(e)}. Falling back to random sample.")
+            sampled_df = df.sample(max_sample_size)
+    else:
+        # Use the full dataset if it's small enough
+        sampled_df = df
+        
     # Compute text similarity
     try:
-        similarity_df = compute_content_similarity(df)
+        with st.spinner("Computing content similarity... This may take a few minutes."):
+            similarity_df = compute_content_similarity(sampled_df)
     except Exception as e:
         print(f"Error computing content similarity: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        st.error(f"Error computing similarity: {str(e)}")
         return results
     
     if not similarity_df.empty:
@@ -569,29 +738,37 @@ def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
                 results['tables']['potential_duplicates'] = duplicates
                 
                 # Generate consolidation recommendations
-                recommendations = generate_consolidation_recommendations(similarity_df, df)
-                if not recommendations.empty:
-                    results['tables']['consolidation_recommendations'] = recommendations
+                try:
+                    recommendations = generate_consolidation_recommendations(similarity_df, sampled_df)
+                    if not recommendations.empty:
+                        results['tables']['consolidation_recommendations'] = recommendations
+                except Exception as e:
+                    print(f"Error generating consolidation recommendations: {str(e)}")
         except Exception as e:
             print(f"Error finding potential duplicates: {str(e)}")
         
         # Create network visualization
         try:
-            network_fig = plot_similarity_network(similarity_df)
-            results['figures']['similarity_network'] = network_fig
+            with st.spinner("Creating similarity network visualization..."):
+                network_fig = plot_similarity_network(similarity_df)
+                results['figures']['similarity_network'] = network_fig
         except Exception as e:
             print(f"Error creating network visualization: {str(e)}")
         
         # If department data exists, create department similarity heatmap
         if 'dept_1' in similarity_df.columns and 'dept_2' in similarity_df.columns:
             try:
-                dept_fig = plot_department_similarity_heatmap(similarity_df)
-                results['figures']['department_similarity'] = dept_fig
+                with st.spinner("Creating department similarity heatmap..."):
+                    dept_fig = plot_department_similarity_heatmap(similarity_df)
+                    results['figures']['department_similarity'] = dept_fig
             except Exception as e:
                 print(f"Error creating department heatmap: {str(e)}")
         
         # Calculate metrics
         try:
+            # Ensure similarity_score is float
+            similarity_df['similarity_score'] = similarity_df['similarity_score'].astype(float)
+            
             high_similarity_pairs = len(similarity_df[similarity_df['similarity_score'] >= 0.8])
             medium_similarity_pairs = len(similarity_df[(similarity_df['similarity_score'] >= 0.6) & 
                                                      (similarity_df['similarity_score'] < 0.8)])
@@ -609,6 +786,15 @@ def analyze_content_similarity(df: pd.DataFrame) -> Dict[str, Any]:
                 results['metrics']['cross_department'] = {
                     'total_cross_dept_pairs': cross_dept_pairs,
                     'percent_cross_dept': (cross_dept_pairs / len(similarity_df) * 100) if len(similarity_df) > 0 else 0
+                }
+                
+            # Add sampling metadata to results
+            if dataset_size > max_sample_size:
+                results['metadata'] = {
+                    'sampled': True,
+                    'original_size': dataset_size,
+                    'sample_size': len(sampled_df),
+                    'sample_method': 'stratified' if 'sponsoring_dept' in df.columns or 'category_name' in df.columns else 'random'
                 }
         except Exception as e:
             print(f"Error calculating metrics: {str(e)}")
