@@ -445,9 +445,11 @@ def plot_similarity_network(similarity_df: pd.DataFrame,
                 color=[G.degree(node) for node in G.nodes()],
                 colorbar=dict(
                     thickness=15,
-                    title='Node Connections',
-                    xanchor='left',
-                    titleside='right'
+                    title=dict(
+                        text='Node Connections',
+                        side='right'
+                    ),
+                    xanchor='left'
                 ),
                 line=dict(width=2)
             )
