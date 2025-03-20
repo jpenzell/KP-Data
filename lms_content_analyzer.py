@@ -211,27 +211,34 @@ class LMSContentAnalyzer:
         for col in self.df.columns:
             print(f"- {col}")
 
-        # Create mapping
-        column_mapping = {
-            'Course Title': 'course_title',
-            'Course No': 'course_no',
-            'Course Description': 'course_description',
-            'Course Abstract': 'course_abstract',
-            'Course Version': 'course_version',
-            'Course Created By': 'course_created_by',
-            'Course Available From': 'course_available_from',
-            'Course Discontinued From': 'course_discontinued_from',
-            'Course Keywords': 'course_keywords',
-            'Category Name': 'category_name'
-        }
+        try:
+            # Use the enhanced column cleaning function from optimizations
+            from src.utils.optimizations import clean_column_names
+            self.df = clean_column_names(self.df)
+            print("\nApplied enhanced column name standardization")
+        except ImportError:
+            print("\nFalling back to basic column name cleaning")
+            # Fallback to original behavior if import fails
+            column_mapping = {
+                'Course Title': 'course_title',
+                'Course No': 'course_no',
+                'Course Description': 'course_description',
+                'Course Abstract': 'course_abstract',
+                'Course Version': 'course_version',
+                'Course Created By': 'course_created_by',
+                'Course Available From': 'course_available_from',
+                'Course Discontinued From': 'course_discontinued_from',
+                'Course Keywords': 'course_keywords',
+                'Category Name': 'category_name'
+            }
 
-        # Print mapping
-        print("\nColumn name mapping:")
-        for old, new in column_mapping.items():
-            print(f"- '{old}' -> '{new}'")
+            # Print mapping
+            print("\nColumn name mapping:")
+            for old, new in column_mapping.items():
+                print(f"- '{old}' -> '{new}'")
 
-        # Rename columns
-        self.df = self.df.rename(columns=column_mapping)
+            # Rename columns
+            self.df = self.df.rename(columns=column_mapping)
 
     def _classify_columns(self):
         print("\nColumn Classification:\n")
