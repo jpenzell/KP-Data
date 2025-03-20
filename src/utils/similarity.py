@@ -186,7 +186,9 @@ def compute_content_similarity(df: pd.DataFrame,
                         similar_pairs.append((
                             str(course_i_id), 
                             str(course_j_id), 
-                            float(similarity)
+                            float(similarity),
+                            df_valid.iloc[course_i_idx].get('course_title', ''),
+                            df_valid.iloc[course_j_idx].get('course_title', '')
                         ))
         
         # Clear progress
@@ -206,54 +208,66 @@ def compute_content_similarity(df: pd.DataFrame,
     if similar_pairs:
         try:
             print(f"Found {len(similar_pairs)} similar pairs. Creating similarity DataFrame...")
-            similar_df = pd.DataFrame(similar_pairs, columns=['course_id_1', 'course_id_2', 'similarity_score'])
+            similar_df = pd.DataFrame(similar_pairs, 
+                                    columns=['course_id_1', 'course_id_2', 'similarity_score', 'title_1', 'title_2'])
             
             # Sort by similarity score (highest first)
             similar_df = similar_df.sort_values('similarity_score', ascending=False)
             
-            # Limit number of results
+            # Filter out any rows with empty titles
+            has_title_1 = similar_df['title_1'].apply(lambda x: isinstance(x, str) and len(x.strip()) > 0) 
+            has_title_2 = similar_df['title_2'].apply(lambda x: isinstance(x, str) and len(x.strip()) > 0)
+            similar_df = similar_df[has_title_1 & has_title_2]
+            
+            print(f"After filtering incomplete metadata: {len(similar_df)} pairs remaining")
+            
+            # Add more metadata for visualization and analysis
+            print("Adding metadata to similarity pairs...")
+            
+            # Create lookup dictionaries from df_valid (the exact data used in similarity computation)
+            # This ensures we only reference metadata that exists in our analysis subset
+            valid_idx = df_valid.reset_index().set_index('course_id')
+            
+            # Add additional metadata if available
+            metadata_columns = {
+                'category_name': 'category',
+                'sponsoring_dept': 'dept',
+                'total_2024_activity': 'activity',
+                'data_source': 'source'
+            }
+            
+            for col, prefix in metadata_columns.items():
+                if col in df_valid.columns:
+                    # Convert categorical columns safely
+                    if pd.api.types.is_categorical_dtype(df_valid[col]):
+                        df_valid[col] = df_valid[col].astype(str)
+                        
+                    # Create mapping dictionary
+                    id_to_value = df_valid.set_index('course_id')[col].to_dict()
+                    
+                    # Apply mapping - use None for missing values instead of NaN
+                    similar_df[f'{prefix}_1'] = similar_df['course_id_1'].map(
+                        lambda x: id_to_value.get(x, None))
+                    similar_df[f'{prefix}_2'] = similar_df['course_id_2'].map(
+                        lambda x: id_to_value.get(x, None))
+                        
+                    # Filter out pairs with missing metadata
+                    if col in ['category_name', 'sponsoring_dept', 'data_source']:
+                        has_value_1 = similar_df[f'{prefix}_1'].notna()
+                        has_value_2 = similar_df[f'{prefix}_2'].notna()
+                        similar_df = similar_df[has_value_1 & has_value_2]
+                        print(f"After filtering missing {col}: {len(similar_df)} pairs remaining")
+            
+            # Add is_cross_dept flag if dept columns exist
+            if 'dept_1' in similar_df.columns and 'dept_2' in similar_df.columns:
+                similar_df['is_cross_dept'] = (similar_df['dept_1'] != similar_df['dept_2']) & \
+                                            (~similar_df['dept_1'].isna()) & \
+                                            (~similar_df['dept_2'].isna())
+            
+            # Limit number of results after all filtering
             similar_df = similar_df.head(max_results)
             
-            # Add titles and other metadata for easier interpretation
-            print("Adding metadata to similarity pairs...")
-            id_to_title = df.set_index('course_id')['course_title'].astype(str).to_dict()
-            
-            # Handle category_name which might be categorical
-            if 'category_name' in df.columns:
-                if pd.api.types.is_categorical_dtype(df['category_name']):
-                    id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
-                else:
-                    id_to_category = df.set_index('course_id')['category_name'].astype(str).to_dict()
-            else:
-                id_to_category = {}
-            
-            # Handle sponsoring_dept which might be categorical
-            if 'sponsoring_dept' in df.columns:
-                if pd.api.types.is_categorical_dtype(df['sponsoring_dept']):
-                    id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
-                else:
-                    id_to_dept = df.set_index('course_id')['sponsoring_dept'].astype(str).to_dict()
-            else:
-                id_to_dept = {}
-            
-            # Map values safely
-            similar_df['title_1'] = similar_df['course_id_1'].map(lambda x: id_to_title.get(x, "Unknown"))
-            similar_df['title_2'] = similar_df['course_id_2'].map(lambda x: id_to_title.get(x, "Unknown"))
-            
-            if id_to_category:
-                similar_df['category_1'] = similar_df['course_id_1'].map(lambda x: id_to_category.get(x, "Unknown"))
-                similar_df['category_2'] = similar_df['course_id_2'].map(lambda x: id_to_category.get(x, "Unknown"))
-            
-            if id_to_dept:
-                similar_df['dept_1'] = similar_df['course_id_1'].map(lambda x: id_to_dept.get(x, "Unknown"))
-                similar_df['dept_2'] = similar_df['course_id_2'].map(lambda x: id_to_dept.get(x, "Unknown"))
-                
-                # Add flag for cross-department similarity - ensure string comparison
-                similar_df['is_cross_dept'] = (similar_df['dept_1'] != similar_df['dept_2']) & \
-                                             (~similar_df['dept_1'].isna()) & \
-                                             (~similar_df['dept_2'].isna())
-            
-            print(f"Found {len(similar_df)} similar course pairs with similarity ≥ {min_similarity}")
+            print(f"Final similarity DataFrame contains {len(similar_df)} course pairs with similarity ≥ {min_similarity}")
             return similar_df
         except Exception as e:
             print(f"Error creating similarity DataFrame: {str(e)}")

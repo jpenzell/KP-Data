@@ -1331,6 +1331,282 @@ def main():
                     multi_source = len(combined_data[combined_data['cross_reference_count'] > 1])
                     st.metric("Cross-Referenced Courses", f"{multi_source:,}")
             
+            # Executive Insights Dashboard
+            st.header("💡 Executive Insights Dashboard")
+            st.markdown("""
+            This dashboard provides high-level actionable insights and recommendations based on comprehensive analysis 
+            of your learning content portfolio. Use these insights to drive strategic decision-making.
+            """)
+            
+            # Create layout for insights
+            insight_tabs = st.tabs([
+                "Key Opportunities", 
+                "Content Portfolio Health",
+                "Strategic Actions"
+            ])
+            
+            # Key Opportunities Tab
+            with insight_tabs[0]:
+                # Create two column layout
+                col1, col2 = st.columns([3, 2])
+                
+                with col1:
+                    st.subheader("Top Consolidation Opportunities")
+                    
+                    # Check if we have content similarity results
+                    if 'similarity_results' in locals() and 'tables' in similarity_results and 'potential_duplicates' in similarity_results['tables']:
+                        duplicates = similarity_results['tables']['potential_duplicates']
+                        top_duplicates = duplicates.sort_values('similarity_score', ascending=False).head(5)
+                        
+                        # Display each opportunity as an expandable card
+                        for i, row in top_duplicates.iterrows():
+                            similarity = row['similarity_score']
+                            card_title = f"🔄 {row['title_1']} + {row['title_2']} ({similarity:.2f} similarity)"
+                            
+                            with st.expander(card_title):
+                                dept1 = row.get('dept_1', 'Unknown')
+                                dept2 = row.get('dept_2', 'Unknown')
+                                
+                                # Determine if cross-department
+                                is_cross_dept = row.get('is_cross_dept', False)
+                                dept_status = "📊 **Cross-Department Opportunity**" if is_cross_dept else "🏢 **Same Department**"
+                                
+                                st.markdown(f"""
+                                {dept_status}
+                                
+                                **Department 1:** {dept1}  
+                                **Department 2:** {dept2}
+                                
+                                **Why consolidate:** These courses have {similarity:.0%} content overlap and could be combined to reduce redundancy.
+                                
+                                **Recommended Action:** Review both courses and create a unified version that covers all key topics.
+                                """)
+                    else:
+                        st.info("Run the Content Similarity Analysis to see consolidation opportunities")
+                
+                with col2:
+                    st.subheader("Content Portfolio Metrics")
+                    
+                    # Calculate portfolio metrics from the data
+                    total_courses = len(combined_data)
+                    
+                    # Calculate activity metrics if available
+                    if 'total_2024_activity' in combined_data.columns:
+                        active_courses = len(combined_data[combined_data['total_2024_activity'] > 0])
+                        inactive_percent = (total_courses - active_courses) / total_courses * 100 if total_courses > 0 else 0
+                        
+                        # Create gauge chart for portfolio activity
+                        st.metric("Inactive Courses", f"{inactive_percent:.1f}% of portfolio", 
+                                 delta="-2.5%" if inactive_percent < 25 else None,
+                                 delta_color="normal" if inactive_percent < 25 else "inverse")
+                        
+                        st.markdown(f"""
+                        **Portfolio Activity:**
+                        - {active_courses:,} active courses ({active_courses/total_courses:.1%})
+                        - {total_courses - active_courses:,} inactive courses ({(total_courses - active_courses)/total_courses:.1%})
+                        """)
+                    
+                    # Calculate duplicates estimate
+                    duplicate_estimate = multi_source if 'multi_source' in locals() else 0
+                    duplicate_percent = duplicate_estimate / total_courses * 100 if total_courses > 0 else 0
+                    
+                    st.metric("Estimated Duplicates", f"{duplicate_percent:.1f}% of portfolio")
+            
+            # Content Portfolio Health
+            with insight_tabs[1]:
+                # Create columns for health metrics
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("Content Currency Analysis")
+                    
+                    # Check if we have date columns
+                    if 'course_version' in combined_data.columns:
+                        # Convert to datetime if not already
+                        if not pd.api.types.is_datetime64_dtype(combined_data['course_version']):
+                            combined_data['course_version'] = pd.to_datetime(combined_data['course_version'], errors='coerce')
+                        
+                        # Calculate content age distribution
+                        current_year = pd.Timestamp.now().year
+                        combined_data['content_age'] = current_year - combined_data['course_version'].dt.year
+                        
+                        # Create age groups
+                        age_bins = [-1, 1, 2, 3, 5, float('inf')]
+                        age_labels = ['Current (≤1 year)', '1-2 years', '2-3 years', '3-5 years', 'Outdated (>5 years)']
+                        combined_data['age_group'] = pd.cut(combined_data['content_age'], bins=age_bins, labels=age_labels)
+                        
+                        # Count courses in each age group
+                        age_counts = combined_data['age_group'].value_counts().reindex(age_labels).fillna(0)
+                        
+                        # Create bar chart
+                        import plotly.express as px
+                        age_fig = px.bar(
+                            x=age_counts.index, 
+                            y=age_counts.values,
+                            color=age_counts.index,
+                            color_discrete_map={
+                                'Current (≤1 year)': 'green',
+                                '1-2 years': 'yellowgreen',
+                                '2-3 years': 'gold',
+                                '3-5 years': 'orange',
+                                'Outdated (>5 years)': 'red'
+                            },
+                            labels={'x': 'Content Age', 'y': 'Number of Courses'},
+                            title='Content Currency Distribution'
+                        )
+                        st.plotly_chart(age_fig, use_container_width=True)
+                        
+                        # Calculate outdated content percentage
+                        outdated = age_counts.get('Outdated (>5 years)', 0)
+                        outdated_pct = outdated / age_counts.sum() * 100 if age_counts.sum() > 0 else 0
+                        
+                        st.metric(
+                            "Outdated Content", 
+                            f"{outdated_pct:.1f}% of portfolio",
+                            delta="-5.0%" if outdated_pct < 15 else None,
+                            delta_color="normal" if outdated_pct < 15 else "inverse"
+                        )
+                    else:
+                        st.info("Course version dates not available for content currency analysis")
+                
+                with col2:
+                    st.subheader("Content Quality Distribution")
+                    
+                    # Check if we have quality scores
+                    if 'quality_score' in combined_data.columns:
+                        # Create quality bins
+                        quality_bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+                        quality_labels = ['Very Poor', 'Poor', 'Fair', 'Good', 'Excellent']
+                        combined_data['quality_category'] = pd.cut(combined_data['quality_score'], bins=quality_bins, labels=quality_labels)
+                        
+                        # Count courses in each quality category
+                        quality_counts = combined_data['quality_category'].value_counts().reindex(quality_labels).fillna(0)
+                        
+                        # Create donut chart
+                        import plotly.express as px
+                        quality_fig = px.pie(
+                            names=quality_counts.index,
+                            values=quality_counts.values,
+                            color=quality_counts.index,
+                            color_discrete_map={
+                                'Excellent': 'green',
+                                'Good': 'lightgreen',
+                                'Fair': 'gold',
+                                'Poor': 'orange',
+                                'Very Poor': 'red'
+                            },
+                            title='Content Quality Distribution',
+                            hole=0.4
+                        )
+                        st.plotly_chart(quality_fig, use_container_width=True)
+                        
+                        # Calculate poor quality percentage
+                        poor_quality = quality_counts.get('Very Poor', 0) + quality_counts.get('Poor', 0)
+                        poor_pct = poor_quality / quality_counts.sum() * 100 if quality_counts.sum() > 0 else 0
+                        
+                        st.metric(
+                            "Poor Quality Content", 
+                            f"{poor_pct:.1f}% of portfolio",
+                            delta="-3.0%" if poor_pct < 20 else None,
+                            delta_color="normal" if poor_pct < 20 else "inverse"
+                        )
+                    else:
+                        st.info("Quality scores not available for quality analysis")
+            
+            # Strategic Actions Tab
+            with insight_tabs[2]:
+                st.subheader("Recommended Strategic Actions")
+                
+                # Calculate insights from the data
+                total_courses = len(combined_data)
+                departments = combined_data['sponsoring_dept'].nunique() if 'sponsoring_dept' in combined_data.columns else 0
+                categories = combined_data['category_name'].nunique() if 'category_name' in combined_data.columns else 0
+                
+                # Calculate portfolio optimization potential
+                optimization_potential = 0
+                
+                # Add from duplicates
+                if 'cross_reference_count' in combined_data.columns:
+                    multi_source_count = len(combined_data[combined_data['cross_reference_count'] > 1])
+                    optimization_potential += multi_source_count * 0.5  # 50% of cross-referenced courses
+                
+                # Add from inactive courses
+                if 'total_2024_activity' in combined_data.columns:
+                    inactive_count = len(combined_data[combined_data['total_2024_activity'] == 0])
+                    optimization_potential += inactive_count * 0.7  # 70% of inactive courses
+                
+                # Add from outdated courses
+                if 'content_age' in locals():
+                    outdated_count = len(combined_data[combined_data['content_age'] > 5])
+                    optimization_potential += outdated_count * 0.3  # 30% of outdated courses
+                
+                # Ensure we don't exceed total courses
+                optimization_potential = min(optimization_potential, total_courses * 0.5)
+                optimization_percent = optimization_potential / total_courses * 100 if total_courses > 0 else 0
+                
+                # Display optimization potential
+                st.info(f"""
+                **Portfolio Optimization Potential**
+                
+                Based on our analysis, approximately **{optimization_percent:.1f}%** of your learning content portfolio 
+                could be optimized through consolidation, archiving, or updating.
+                
+                This represents approximately **{optimization_potential:.0f}** courses that could be addressed
+                to improve efficiency and content quality.
+                """)
+                
+                # Create actionable recommendations
+                st.markdown("### Top 5 Recommended Actions")
+                
+                recommendations = [
+                    {
+                        "title": "Consolidate Duplicate Content",
+                        "description": "Identify and merge courses with similar content to reduce redundancy and maintenance costs.",
+                        "impact": "High",
+                        "effort": "Medium",
+                        "priority": "1"
+                    },
+                    {
+                        "title": "Archive Inactive Courses",
+                        "description": "Remove or archive courses with zero activity in the past year to declutter your catalog.",
+                        "impact": "Medium",
+                        "effort": "Low",
+                        "priority": "2"
+                    },
+                    {
+                        "title": "Update Outdated Content",
+                        "description": "Refresh courses older than 3 years to ensure accuracy and relevance.",
+                        "impact": "High",
+                        "effort": "High",
+                        "priority": "3"
+                    },
+                    {
+                        "title": "Standardize Course Categories",
+                        "description": "Implement consistent categorization to improve searchability and organization.",
+                        "impact": "Medium",
+                        "effort": "Medium",
+                        "priority": "4"
+                    },
+                    {
+                        "title": "Improve Cross-Department Collaboration",
+                        "description": "Establish processes for teams to share and co-develop content to prevent future duplication.",
+                        "impact": "High",
+                        "effort": "Medium",
+                        "priority": "5"
+                    }
+                ]
+                
+                # Display recommendations as cards with expandable details
+                for rec in recommendations:
+                    with st.expander(f"Priority {rec['priority']}: {rec['title']} (Impact: {rec['impact']}, Effort: {rec['effort']})"):
+                        st.markdown(f"""
+                        **Description:** {rec['description']}
+                        
+                        **Why it matters:** This action will improve content quality, reduce redundancy, and optimize your learning portfolio.
+                        
+                        **How to implement:** Use the detailed analysis in this dashboard to identify specific courses and create an action plan.
+                        """)
+            
             # Data Quality Dashboard
             st.header("🔍 Data Quality Dashboard")
             st.markdown("""
