@@ -161,12 +161,23 @@ def merge_and_standardize_data(dataframes):
             chunks = [all_df.iloc[i:i+chunk_size] for i in range(0, len(all_df), chunk_size)]
             for i, chunk in enumerate(chunks):
                 print(f"Processing chunk {i+1}/{len(chunks)}...")
-                # Create a robust deduplication key using vectorized operations
+                # Create a robust deduplication key using enhanced approaches
                 chunks[i] = create_deduplication_key(chunk)
             all_df = pd.concat(chunks, ignore_index=True)
         else:
-            # Create a robust deduplication key using vectorized operations
+            # Create a robust deduplication key using enhanced approaches
             all_df = create_deduplication_key(all_df)
+        
+        # Apply fuzzy matching to further identify duplicates
+        print("Applying fuzzy matching to identify additional duplicates...")
+        try:
+            # Only apply if dataset is a reasonable size (less than 20k rows)
+            if len(all_df) <= 20000:
+                all_df = fuzzy_match_courses(all_df)
+            else:
+                print("Skipping fuzzy matching due to large dataset size")
+        except Exception as e:
+            print(f"Warning: Fuzzy matching failed: {str(e)}")
         
         # Remove duplicate column names before groupby
         print("Removing duplicate columns...")
@@ -178,25 +189,45 @@ def merge_and_standardize_data(dataframes):
             all_df = all_df.loc[:, ~all_df.columns.duplicated()]
         
         # Group by dedup_key and aggregate
-        print("Performing deduplication and merging...")
+        print("Performing enhanced deduplication and merging...")
         agg_dict = {
             'cross_reference_count': 'sum',
             'data_source': lambda x: ' | '.join(sorted(set(x)))
         }
         
-        # Add aggregation rules for other columns
+        # Add aggregation rules for other columns with improved strategy
         for col in all_df.columns:
             if col not in ['dedup_key', 'cross_reference_count', 'data_source']:
-                if str(col).startswith('is_'):
+                if col == 'course_title':
+                    # For titles, prefer the longest non-null value (usually most informative)
+                    agg_dict[col] = lambda x: max(x.dropna().astype(str), key=len) if not x.dropna().empty else None
+                elif col == 'course_description' or col == 'course_abstract':
+                    # For descriptions, also prefer the longest
+                    agg_dict[col] = lambda x: max(x.dropna().astype(str), key=len) if not x.dropna().empty else None
+                elif str(col).startswith('is_'):
                     agg_dict[col] = 'max'  # Use OR operation for boolean flags
                 elif pd.api.types.is_numeric_dtype(all_df[col]):
-                    agg_dict[col] = 'first'  # Use first value for numeric columns
+                    # For numeric columns, use sum for counts, mean for rates/measurements
+                    if any(count_word in col for count_word in ['count', 'activity', 'completions', 'learner']):
+                        agg_dict[col] = 'sum'
+                    else:
+                        agg_dict[col] = 'mean'
+                elif 'date' in col or col in ['course_version', 'course_available_from', 'course_discontinued_from']:
+                    # For dates, prefer the latest non-null value
+                    agg_dict[col] = lambda x: pd.to_datetime(x, errors='coerce').max()
                 else:
-                    agg_dict[col] = 'first'  # Use first non-null value for other columns
+                    # Default strategy: use first non-null value
+                    agg_dict[col] = lambda x: x.dropna().iloc[0] if not x.dropna().empty else None
         
-        # Perform the groupby operation
+        # Perform the groupby operation with improved aggregation
         merged_df = all_df.groupby('dedup_key', as_index=False).agg(agg_dict)
-        print(f"Final rows after deduplication: {len(merged_df)}")
+        initial_row_count = len(all_df)
+        final_row_count = len(merged_df)
+        dedup_reduction = initial_row_count - final_row_count
+        dedup_percent = (dedup_reduction / initial_row_count) * 100 if initial_row_count > 0 else 0
+        
+        print(f"Enhanced deduplication reduced dataset from {initial_row_count:,} to {final_row_count:,} rows")
+        print(f"Removed {dedup_reduction:,} duplicate courses ({dedup_percent:.1f}% reduction)")
         
         # Clean up and standardize the final dataset
         print("\nStandardizing columns...")
@@ -231,34 +262,115 @@ def merge_and_standardize_data(dataframes):
 
 def create_deduplication_key(df):
     """
-    Create a deduplication key using vectorized operations.
+    Create a sophisticated deduplication key using multiple fields and fuzzy matching.
     
     Args:
         df: DataFrame to process
         
     Returns:
-        DataFrame with deduplication key added
+        DataFrame with enhanced deduplication key added
     """
-    print("Creating deduplication key...")
+    print("Creating enhanced deduplication key...")
     
-    # Initialize dedup_key with course_no
-    df['dedup_key'] = df['course_no'].astype(str).str.lower().str.strip()
+    # Create a copy to avoid modification warnings
+    df = df.copy()
     
-    # For rows where offering_template_no is available and course_no is missing or generic
-    if 'offering_template_no' in df.columns:
-        mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
-        df.loc[mask, 'dedup_key'] = df.loc[mask, 'offering_template_no'].astype(str).str.lower().str.strip()
+    # Step 1: Clean and standardize fields that will be used for deduplication
+    # Standardize course_no - remove source prefixes to enable cross-source matching
+    if 'course_no' in df.columns:
+        # Remove source prefixes like "source_1_" to enable matching across sources
+        df['clean_course_no'] = df['course_no'].astype(str).str.lower().str.strip()
+        df['clean_course_no'] = df['clean_course_no'].str.replace(r'^source_\d+_', '', regex=True)
+        
+        # Further clean by removing common prefixes and non-alphanumeric characters
+        df['clean_course_no'] = df['clean_course_no'].str.replace(r'[^a-z0-9]', '_', regex=True)
+    else:
+        df['clean_course_no'] = ""
     
-    # For rows where course_title is available and dedup_key is still missing
+    # Standardize course title
     if 'course_title' in df.columns:
-        mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
-        df.loc[mask, 'dedup_key'] = df.loc[mask, 'course_title'].astype(str).str.lower().str.strip()
+        df['clean_title'] = df['course_title'].astype(str).str.lower().str.strip()
+        # Remove punctuation and extra spaces
+        df['clean_title'] = df['clean_title'].str.replace(r'[^\w\s]', ' ', regex=True)
+        df['clean_title'] = df['clean_title'].str.replace(r'\s+', ' ', regex=True)
+    else:
+        df['clean_title'] = ""
+    
+    # Step 2: Create a primary deduplication key
+    # Priority order: clean_course_no > offering_template_no > normalized title
+    
+    # Initialize with clean course number if it exists and isn't generic
+    df['dedup_key'] = df['clean_course_no']
+    
+    # For rows where course_no is missing, generic, or just a source prefix
+    generic_values = ['', 'nan', 'none', 'null', 'unknown', 'test', 'temp']
+    mask = (df['dedup_key'].isna() | 
+            df['dedup_key'].isin(generic_values) | 
+            df['dedup_key'] == "")
+    
+    # Try offering_template_no next
+    if 'offering_template_no' in df.columns:
+        template_values = df.loc[mask, 'offering_template_no'].astype(str).str.lower().str.strip()
+        df.loc[mask, 'dedup_key'] = template_values
+    
+    # For rows still missing a key, use normalized title
+    mask = (df['dedup_key'].isna() | 
+            df['dedup_key'].isin(generic_values) | 
+            df['dedup_key'] == "")
+    
+    if 'clean_title' in df.columns:
+        df.loc[mask, 'dedup_key'] = df.loc[mask, 'clean_title']
+    
+    # Step 3: For stronger deduplication, create a composite key for similar titles 
+    # when direct ID matching fails
+    
+    # If we have description data, incorporate it into the key for better matching
+    if 'course_description' in df.columns and 'clean_title' in df.columns:
+        # Create a short description fingerprint (first 50 chars)
+        df['desc_fingerprint'] = df['course_description'].astype(str).str.lower().str.strip()
+        df['desc_fingerprint'] = df['desc_fingerprint'].str.replace(r'[^\w\s]', ' ', regex=True)
+        df['desc_fingerprint'] = df['desc_fingerprint'].str.replace(r'\s+', ' ', regex=True)
+        df['desc_fingerprint'] = df['desc_fingerprint'].str[:50]  # First 50 chars as fingerprint
+        
+        # For rows with weak primary keys (e.g., just using title), strengthen with description
+        mask = ~df['clean_course_no'].astype(bool)  # Rows without a real course number
+        df.loc[mask, 'dedup_key'] = (df.loc[mask, 'clean_title'] + 
+                                    "_" + 
+                                    df.loc[mask, 'desc_fingerprint'])
+    
+    # Step 4: Add type/category information for even better matching
+    category_fields = ['category_name', 'course_type', 'sponsoring_dept']
+    for field in category_fields:
+        if field in df.columns:
+            # Only add to rows with weak keys (using just title or description)
+            mask = ~df['clean_course_no'].astype(bool)
+            field_values = df.loc[mask, field].astype(str).str.lower().str.strip()
+            # Add first 10 chars of category to dedup key
+            df.loc[mask, 'dedup_key'] = df.loc[mask, 'dedup_key'] + "_" + field_values.str[:10]
+    
+    # Step 5: Add duration as a final discriminator for generic courses
+    if 'duration_mins' in df.columns:
+        # For rows using just title-based matching and having duration
+        mask = (~df['clean_course_no'].astype(bool)) & (df['duration_mins'].notna())
+        # Group durations into bins (nearest 30 mins) to allow for minor differences
+        duration_values = df.loc[mask, 'duration_mins'].astype(float) // 30 * 30
+        df.loc[mask, 'dedup_key'] = df.loc[mask, 'dedup_key'] + "_" + duration_values.astype(str)
+    
+    # Clean up any messy keys
+    df['dedup_key'] = df['dedup_key'].str.replace(r'_+', '_', regex=True)  # Replace multiple underscores
+    df['dedup_key'] = df['dedup_key'].str.replace(r'^_|_$', '', regex=True)  # Remove leading/trailing underscores
     
     # Ensure every row has a dedup_key
-    mask = df['dedup_key'].isna() | df['dedup_key'].isin(['', 'nan', 'none', 'null'])
+    mask = df['dedup_key'].isna() | df['dedup_key'] == ""
     if mask.any():
+        print(f"Creating random keys for {mask.sum()} rows with no usable identification data")
         df.loc[mask, 'dedup_key'] = "unknown_" + df.loc[mask].index.astype(str)
     
+    # Clean up temporary columns
+    for col in ['clean_course_no', 'clean_title', 'desc_fingerprint']:
+        if col in df.columns:
+            df = df.drop(columns=[col])
+            
     return df
 
 def generate_course_id(row):
@@ -999,6 +1111,132 @@ def handle_missing_data(df, section):
                 df_modified[field] = df_modified[field].fillna(custom_value)
     
     return df_modified
+
+def fuzzy_match_courses(df, similarity_threshold=0.85):
+    """
+    Performs a second-pass fuzzy matching on courses to identify additional duplicates
+    after initial deduplication. This helps catch courses with slightly different names
+    or descriptions that are actually the same course.
+    
+    Args:
+        df: DataFrame with initial deduplication already performed
+        similarity_threshold: Minimum string similarity to consider courses as duplicates
+        
+    Returns:
+        DataFrame with updated deduplication keys that group similar courses
+    """
+    try:
+        import jellyfish  # For string similarity
+        from tqdm.auto import tqdm  # For progress tracking
+    except ImportError:
+        print("Warning: jellyfish or tqdm package not available. Installing them for fuzzy matching...")
+        import subprocess
+        subprocess.check_call(["pip", "install", "jellyfish", "tqdm"])
+        import jellyfish
+        from tqdm.auto import tqdm
+    
+    print("Performing fuzzy course matching...")
+    
+    # Skip if too few courses or too many (performance reasons)
+    if len(df) < 10 or len(df) > 20000:
+        print(f"Skipping fuzzy matching: {'too few' if len(df) < 10 else 'too many'} courses")
+        return df
+    
+    # Create a copy to avoid modifying the original
+    df_fuzzy = df.copy()
+    
+    # Create a map to track which courses should be grouped together
+    group_map = {}  # original_id -> group_id
+    
+    # First, extract courses that have proper course numbers (higher confidence)
+    high_confidence = df_fuzzy[df_fuzzy['course_no'].str.contains(r'^source_\d+_', regex=True) == False]
+    high_confidence = high_confidence[~high_confidence['course_no'].isin(['', 'nan', 'none', 'null', 'unknown'])]
+    
+    # If we have a reasonable number of high confidence courses, use them as reference
+    if len(high_confidence) > 0 and len(high_confidence) < 5000:
+        reference_courses = high_confidence
+    else:
+        # Otherwise just sample from all courses
+        sample_size = min(5000, len(df_fuzzy))
+        reference_courses = df_fuzzy.sample(sample_size)
+    
+    # Prepare fields for comparison
+    if 'course_title' in df_fuzzy.columns:
+        reference_courses['title_for_match'] = reference_courses['course_title'].astype(str).str.lower()
+    else:
+        # Can't do title matching without titles
+        print("Skipping fuzzy matching: no course_title field available")
+        return df
+    
+    # Create a list of courses to check against reference courses
+    # Since we're comparing everything to reference courses, we can check all remaining courses
+    all_other_courses = df_fuzzy[~df_fuzzy.index.isin(reference_courses.index)]
+    
+    # Prepare comparison field for these courses too
+    all_other_courses['title_for_match'] = all_other_courses['course_title'].astype(str).str.lower()
+    
+    # Store the current deduplication keys
+    reference_courses['original_dedup_key'] = reference_courses['dedup_key']
+    all_other_courses['original_dedup_key'] = all_other_courses['dedup_key']
+    
+    # Counter for matches found
+    matches_found = 0
+    
+    print(f"Comparing {len(all_other_courses)} courses against {len(reference_courses)} reference courses")
+    
+    # Reasonable batch size for memory management
+    batch_size = 1000
+    
+    # Process in batches to avoid memory issues
+    for start_idx in range(0, len(all_other_courses), batch_size):
+        end_idx = min(start_idx + batch_size, len(all_other_courses))
+        batch = all_other_courses.iloc[start_idx:end_idx]
+        
+        print(f"Processing batch {start_idx//batch_size + 1}/{(len(all_other_courses) + batch_size - 1)//batch_size}")
+        
+        # For each course in the batch
+        for i, (idx, course) in enumerate(batch.iterrows()):
+            if i % 100 == 0:
+                print(f"  Processing course {i}/{len(batch)}")
+                
+            # Skip if already matched to a group
+            if idx in group_map:
+                continue
+                
+            course_title = course['title_for_match']
+            
+            # Find potential matches (skip empty titles)
+            if not course_title or course_title in ['nan', 'none', 'null', 'unknown']:
+                continue
+                
+            # Check against reference courses
+            for ref_idx, ref_course in reference_courses.iterrows():
+                ref_title = ref_course['title_for_match']
+                
+                # Skip empty reference titles
+                if not ref_title or ref_title in ['nan', 'none', 'null', 'unknown']:
+                    continue
+                
+                # Calculate similarity
+                similarity = jellyfish.jaro_winkler_similarity(course_title, ref_title)
+                
+                # If similar enough, use the reference course's dedup key
+                if similarity >= similarity_threshold:
+                    group_map[idx] = ref_course['original_dedup_key']
+                    matches_found += 1
+                    # Once we find a match, no need to check others
+                    break
+    
+    print(f"Fuzzy matching found {matches_found} additional duplicate courses")
+    
+    # Update deduplication keys based on the matches
+    for idx, group_key in group_map.items():
+        df_fuzzy.loc[idx, 'dedup_key'] = group_key
+    
+    # Clean up temporary columns
+    df_fuzzy = df_fuzzy.drop(columns=['title_for_match', 'original_dedup_key'])
+    
+    return df_fuzzy
 
 def main():
     # Application Header
