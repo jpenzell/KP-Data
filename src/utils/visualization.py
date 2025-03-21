@@ -10,7 +10,7 @@ import streamlit as st
 from typing import Dict, List, Optional, Union, Any
 from datetime import datetime
 
-from models.data_models import VisualizationConfig
+from ..models.data_models import VisualizationConfig
 
 def create_wordcloud(text: str, width: int = 800, height: int = 400) -> plt.Figure:
     """Create a wordcloud visualization from text."""
@@ -574,4 +574,200 @@ def plot_data_quality_metrics(df: pd.DataFrame) -> Dict[str, Any]:
         issues_df = pd.DataFrame(issues).sort_values('count', ascending=False)
         results['tables']['issues'] = issues_df
     
-    return results 
+    return results
+
+def create_bar_chart(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    title: str,
+    config: Optional[VisualizationConfig] = None
+) -> go.Figure:
+    """Create a bar chart with the given configuration."""
+    if config is None:
+        config = VisualizationConfig(title=title)
+    
+    fig = px.bar(
+        df,
+        x=x,
+        y=y,
+        title=config.title,
+        template=config.template,
+        height=config.height,
+        width=config.width,
+        color=config.color,
+        hover_data=config.hover_data
+    )
+    
+    fig.update_layout(
+        showlegend=config.show_legend,
+        legend_title=config.legend_title,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=config.margin,
+        plot_bgcolor=config.background_color,
+        paper_bgcolor=config.background_color,
+        font=dict(
+            family=config.font_family,
+            size=config.font_size
+        ),
+        title=dict(
+            font=dict(size=config.title_font_size)
+        ),
+        xaxis=dict(
+            title=config.x_label,
+            title_font=dict(size=config.axis_font_size)
+        ),
+        yaxis=dict(
+            title=config.y_label,
+            title_font=dict(size=config.axis_font_size)
+        )
+    )
+    
+    return fig
+
+def create_line_chart(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    title: str,
+    config: Optional[VisualizationConfig] = None
+) -> go.Figure:
+    """Create a line chart with the given configuration."""
+    if config is None:
+        config = VisualizationConfig(title=title)
+    
+    fig = px.line(
+        df,
+        x=x,
+        y=y,
+        title=config.title,
+        template=config.template,
+        height=config.height,
+        width=config.width,
+        color=config.color,
+        hover_data=config.hover_data
+    )
+    
+    fig.update_layout(
+        showlegend=config.show_legend,
+        legend_title=config.legend_title,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=config.margin,
+        plot_bgcolor=config.background_color,
+        paper_bgcolor=config.background_color,
+        font=dict(
+            family=config.font_family,
+            size=config.font_size
+        ),
+        title=dict(
+            font=dict(size=config.title_font_size)
+        ),
+        xaxis=dict(
+            title=config.x_label,
+            title_font=dict(size=config.axis_font_size)
+        ),
+        yaxis=dict(
+            title=config.y_label,
+            title_font=dict(size=config.axis_font_size)
+        )
+    )
+    
+    return fig
+
+def create_scatter_plot(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    title: str,
+    config: Optional[VisualizationConfig] = None
+) -> go.Figure:
+    """Create a scatter plot with the given configuration."""
+    if config is None:
+        config = VisualizationConfig(title=title)
+    
+    fig = px.scatter(
+        df,
+        x=x,
+        y=y,
+        title=config.title,
+        template=config.template,
+        height=config.height,
+        width=config.width,
+        color=config.color,
+        size=config.size,
+        hover_data=config.hover_data
+    )
+    
+    fig.update_layout(
+        showlegend=config.show_legend,
+        legend_title=config.legend_title,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=config.margin,
+        plot_bgcolor=config.background_color,
+        paper_bgcolor=config.background_color,
+        font=dict(
+            family=config.font_family,
+            size=config.font_size
+        ),
+        title=dict(
+            font=dict(size=config.title_font_size)
+        ),
+        xaxis=dict(
+            title=config.x_label,
+            title_font=dict(size=config.axis_font_size)
+        ),
+        yaxis=dict(
+            title=config.y_label,
+            title_font=dict(size=config.axis_font_size)
+        )
+    )
+    
+    return fig
+
+def create_heatmap(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    values: str,
+    title: str,
+    config: Optional[VisualizationConfig] = None
+) -> go.Figure:
+    """Create a heatmap with the given configuration."""
+    if config is None:
+        config = VisualizationConfig(title=title)
+    
+    fig = px.imshow(
+        df.pivot(x, y, values),
+        title=config.title,
+        template=config.template,
+        height=config.height,
+        width=config.width,
+        color_continuous_scale="Viridis",
+        aspect="auto"
+    )
+    
+    fig.update_layout(
+        showlegend=config.show_legend,
+        legend_title=config.legend_title,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=config.margin,
+        plot_bgcolor=config.background_color,
+        paper_bgcolor=config.background_color,
+        font=dict(
+            family=config.font_family,
+            size=config.font_size
+        ),
+        title=dict(
+            font=dict(size=config.title_font_size)
+        ),
+        xaxis=dict(
+            title=config.x_label,
+            title_font=dict(size=config.axis_font_size)
+        ),
+        yaxis=dict(
+            title=config.y_label,
+            title_font=dict(size=config.axis_font_size)
+        )
+    )
+    
+    return fig 
