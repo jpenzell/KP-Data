@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 import pandas as pd
 
 @dataclass
@@ -84,12 +84,29 @@ class MissingDataConfig:
 
 @dataclass
 class VisualizationConfig:
-    """Configuration for visualization settings."""
+    """Configuration class for visualization settings."""
     title: str
-    x_label: str
-    y_label: str
-    chart_type: str
-    color_scheme: Optional[str] = None
+    template: str = "plotly_white"
+    height: int = 600
     width: int = 800
-    height: int = 400
-    interactive: bool = True 
+    color: Optional[str] = None
+    size: Optional[str] = None
+    hover_data: Optional[List[str]] = None
+    show_legend: bool = True
+    legend_title: Optional[str] = None
+    margin: Dict[str, int] = None
+    background_color: str = "white"
+    font_family: str = "Arial"
+    font_size: int = 12
+    title_font_size: int = 16
+    axis_font_size: int = 12
+    x_label: Optional[str] = None
+    y_label: Optional[str] = None
+
+    def __post_init__(self):
+        if self.margin is None:
+            self.margin = {"l": 50, "r": 50, "t": 50, "b": 50}
+        if self.x_label is None:
+            self.x_label = ""
+        if self.y_label is None:
+            self.y_label = "" 

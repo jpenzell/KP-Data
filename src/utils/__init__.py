@@ -7,10 +7,11 @@ and optimization that are used throughout the application.
 
 # Import visualization utilities
 from .visualization import (
-    plot_quality_distribution,
-    plot_timeline,
-    create_wordcloud,
-    plot_data_quality_metrics
+    create_bar_chart,
+    create_line_chart,
+    create_scatter_plot,
+    create_heatmap,
+    create_wordcloud
 )
 
 # Import optimization utilities
@@ -25,21 +26,15 @@ from .optimizations import (
 )
 
 # Import similarity analysis utilities
-from .similarity import (
-    compute_content_similarity,
-    find_potential_duplicates,
-    plot_similarity_network,
-    plot_department_similarity_heatmap,
-    generate_consolidation_recommendations,
-    analyze_content_similarity
-)
+from .similarity import compute_content_similarity
 
 __all__ = [
     # Visualization
-    'plot_quality_distribution', 
-    'plot_timeline', 
+    'create_bar_chart',
+    'create_line_chart',
+    'create_scatter_plot',
+    'create_heatmap',
     'create_wordcloud',
-    'plot_data_quality_metrics',
     
     # Optimization
     'remove_unnamed_columns',
@@ -51,10 +46,5 @@ __all__ = [
     'fix_row_count_discrepancy',
     
     # Similarity Analysis
-    'compute_content_similarity',
-    'find_potential_duplicates',
-    'plot_similarity_network',
-    'plot_department_similarity_heatmap',
-    'generate_consolidation_recommendations',
-    'analyze_content_similarity'
+    'compute_content_similarity'
 ] 

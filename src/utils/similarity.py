@@ -44,9 +44,9 @@ def preprocess_text(text: str) -> str:
     return text
 
 @st.cache_data(ttl=3600)
-def compute_content_similarity(df: pd.DataFrame, 
-                             text_columns: List[str] = ['course_title', 'course_description', 'course_abstract', 'course_keywords'], 
-                             min_similarity: float = 0.7,  # Increased from 0.5 to 0.7 for better performance
+def compute_content_similarity(df: pd.DataFrame,
+                             text_columns: List[str] = ['course_title', 'course_description', 'course_abstract', 'course_keywords'],
+                             min_similarity: float = 0.7,
                              max_results: int = 1000,
                              use_progress_bar: bool = True) -> pd.DataFrame:
     """
@@ -72,8 +72,39 @@ def compute_content_similarity(df: pd.DataFrame,
     if 'course_id' in df.columns:
         df['course_id'] = df['course_id'].astype(str)
     
+    # Pre-filter courses with empty titles or missing key metadata
+    print(f"Original dataset size: {len(df)} courses")
+    
+    # More aggressive filtering for courses with missing critical data
+    # Filter out courses with missing titles
+    has_title = df['course_title'].notna() & (df['course_title'].str.strip() != '')
+    print(f"Courses with valid titles: {has_title.sum()} ({(has_title.sum()/len(df))*100:.1f}%)")
+    
+    # Filter for courses with category information
+    if 'category_name' in df.columns:
+        has_category = df['category_name'].notna() & (df['category_name'].astype(str).str.strip() != '')
+        print(f"Courses with category information: {has_category.sum()} ({(has_category.sum()/len(df))*100:.1f}%)")
+    else:
+        has_category = pd.Series(True, index=df.index)
+        
+    # Filter for courses with department information
+    if 'sponsoring_dept' in df.columns:
+        has_dept = df['sponsoring_dept'].notna() & (df['sponsoring_dept'].astype(str).str.strip() != '')
+        print(f"Courses with department information: {has_dept.sum()} ({(has_dept.sum()/len(df))*100:.1f}%)")
+    else:
+        has_dept = pd.Series(True, index=df.index)
+    
+    # Apply all filters to get courses with complete metadata
+    df_filtered = df[has_title & has_category & has_dept].copy()
+    print(f"After filtering courses with incomplete metadata: {len(df_filtered)} courses ({(len(df_filtered)/len(df))*100:.1f}%)")
+    
+    # Check if we have enough courses to analyze
+    if len(df_filtered) < 2:
+        print("Insufficient data with complete metadata for similarity analysis")
+        return pd.DataFrame()
+    
     # Prepare a combined text column for similarity analysis
-    df['combined_text'] = ''
+    df_filtered['combined_text'] = ''
     
     # Weight different text columns differently
     weights = {
@@ -85,11 +116,11 @@ def compute_content_similarity(df: pd.DataFrame,
     
     # Create weighted combined text
     for col in text_columns:
-        if col in df.columns:
+        if col in df_filtered.columns:
             # Check if column is categorical and convert to string if needed
-            if pd.api.types.is_categorical_dtype(df[col]):
+            if pd.api.types.is_categorical_dtype(df_filtered[col]):
                 print(f"Converting categorical column {col} to string")
-                df[col] = df[col].astype(str)
+                df_filtered[col] = df_filtered[col].astype(str)
             
             # Apply the weight by repeating the text
             weight = weights.get(col, 1.0)
@@ -97,17 +128,17 @@ def compute_content_similarity(df: pd.DataFrame,
             # For title, repeat it based on weight
             if col == 'course_title':
                 # Handle non-string columns safely
-                df['combined_text'] += df[col].fillna('').astype(str).apply(
+                df_filtered['combined_text'] += df_filtered[col].fillna('').astype(str).apply(
                     lambda x: (preprocess_text(x) + ' ') * int(weight)
                 )
             else:
                 # For other columns, just add the text
-                df['combined_text'] += df[col].fillna('').astype(str).apply(
+                df_filtered['combined_text'] += df_filtered[col].fillna('').astype(str).apply(
                     lambda x: preprocess_text(x) + ' '
                 )
     
     # Remove rows with empty combined text
-    df_valid = df[df['combined_text'].str.strip() != ''].copy()
+    df_valid = df_filtered[df_filtered['combined_text'].str.strip() != ''].copy()
     
     if len(df_valid) < 2:
         print("Insufficient data for similarity analysis")
@@ -162,6 +193,7 @@ def compute_content_similarity(df: pd.DataFrame,
                 for row_idx in range(chunk_sim.shape[0]):
                     course_i_idx = i + row_idx
                     course_i_id = df_valid.iloc[course_i_idx]['course_id']
+                    course_i_title = df_valid.iloc[course_i_idx]['course_title']
                     
                     # Get column indices of similar courses
                     # Only look at upper triangular part when i==j to avoid duplicates
@@ -181,14 +213,20 @@ def compute_content_similarity(df: pd.DataFrame,
                             continue
                             
                         course_j_id = df_valid.iloc[course_j_idx]['course_id']
+                        course_j_title = df_valid.iloc[course_j_idx]['course_title']
                         
-                        # Add to similar pairs
+                        # Skip if either title is empty/NaN
+                        if (not isinstance(course_i_title, str) or not course_i_title.strip() or 
+                            not isinstance(course_j_title, str) or not course_j_title.strip()):
+                            continue
+                        
+                        # Add to similar pairs with titles directly from the dataframe
                         similar_pairs.append((
                             str(course_i_id), 
                             str(course_j_id), 
                             float(similarity),
-                            df_valid.iloc[course_i_idx].get('course_title', ''),
-                            df_valid.iloc[course_j_idx].get('course_title', '')
+                            course_i_title,
+                            course_j_title
                         ))
         
         # Clear progress
@@ -214,12 +252,28 @@ def compute_content_similarity(df: pd.DataFrame,
             # Sort by similarity score (highest first)
             similar_df = similar_df.sort_values('similarity_score', ascending=False)
             
-            # Filter out any rows with empty titles
+            # Filter out any rows with empty titles again (just to be safe)
             has_title_1 = similar_df['title_1'].apply(lambda x: isinstance(x, str) and len(x.strip()) > 0) 
             has_title_2 = similar_df['title_2'].apply(lambda x: isinstance(x, str) and len(x.strip()) > 0)
             similar_df = similar_df[has_title_1 & has_title_2]
             
-            print(f"After filtering incomplete metadata: {len(similar_df)} pairs remaining")
+            print(f"After filtering empty titles: {len(similar_df)} pairs remaining")
+            
+            # PERFORMANCE IMPROVEMENT: If we still have too many pairs, only keep highest similarity ones
+            if len(similar_df) > 50000:
+                print(f"Too many pairs ({len(similar_df)}), applying higher similarity threshold")
+                # Apply increasingly higher thresholds until we get a reasonable number
+                for threshold in [0.8, 0.85, 0.9, 0.95]:
+                    filtered = similar_df[similar_df['similarity_score'] >= threshold]
+                    if len(filtered) < 50000:
+                        similar_df = filtered
+                        print(f"Applied threshold {threshold}, reduced to {len(similar_df)} pairs")
+                        break
+                
+                # If still too many, just take the top 25000
+                if len(similar_df) > 25000:
+                    similar_df = similar_df.head(25000)
+                    print(f"Still too many pairs, took top {len(similar_df)} by similarity")
             
             # Add more metadata for visualization and analysis
             print("Adding metadata to similarity pairs...")
@@ -228,44 +282,113 @@ def compute_content_similarity(df: pd.DataFrame,
             # This ensures we only reference metadata that exists in our analysis subset
             valid_idx = df_valid.reset_index().set_index('course_id')
             
-            # Add additional metadata if available
+            # Expanded metadata columns list to include all relevant fields for visualization
             metadata_columns = {
                 'category_name': 'category',
                 'sponsoring_dept': 'dept',
                 'total_2024_activity': 'activity',
-                'data_source': 'source'
+                'data_source': 'source',
+                'course_no': 'course_no',
+                'region_entity': 'region',
+                'quality_score': 'quality'
             }
+            
+            # Keep track of pairs with valid metadata
+            valid_pairs_mask = pd.Series(True, index=similar_df.index)
             
             for col, prefix in metadata_columns.items():
                 if col in df_valid.columns:
                     # Convert categorical columns safely
                     if pd.api.types.is_categorical_dtype(df_valid[col]):
                         df_valid[col] = df_valid[col].astype(str)
-                        
-                    # Create mapping dictionary
-                    id_to_value = df_valid.set_index('course_id')[col].to_dict()
                     
-                    # Apply mapping - use None for missing values instead of NaN
+                    # Create mapping dictionary - use empty string for missing values, with explicit NaN check
+                    # Use pd.isna() which is more comprehensive than just checking null
+                    id_to_value = {}
+                    for idx, val in df_valid.set_index('course_id')[col].items():
+                        if pd.isna(val) or (isinstance(val, str) and val.strip() == ''):
+                            id_to_value[idx] = "Not specified"
+                        else:
+                            id_to_value[idx] = str(val)
+                    
+                    # Apply mapping and print status
                     similar_df[f'{prefix}_1'] = similar_df['course_id_1'].map(
-                        lambda x: id_to_value.get(x, None))
+                        lambda x: id_to_value.get(x, "Not specified"))
                     similar_df[f'{prefix}_2'] = similar_df['course_id_2'].map(
-                        lambda x: id_to_value.get(x, None))
-                        
-                    # Filter out pairs with missing metadata
-                    if col in ['category_name', 'sponsoring_dept', 'data_source']:
-                        has_value_1 = similar_df[f'{prefix}_1'].notna()
-                        has_value_2 = similar_df[f'{prefix}_2'].notna()
-                        similar_df = similar_df[has_value_1 & has_value_2]
-                        print(f"After filtering missing {col}: {len(similar_df)} pairs remaining")
+                        lambda x: id_to_value.get(x, "Not specified"))
+                    
+                    # Only apply required field filtering for critical fields
+                    if col in ['sponsoring_dept', 'category_name', 'course_title', 'data_source']:
+                        has_value_1 = similar_df[f'{prefix}_1'].apply(
+                            lambda x: x != "Not specified" and isinstance(x, str) and len(x.strip()) > 0)
+                        has_value_2 = similar_df[f'{prefix}_2'].apply(
+                            lambda x: x != "Not specified" and isinstance(x, str) and len(x.strip()) > 0)
+                        valid_pairs_mask = valid_pairs_mask & has_value_1 & has_value_2
+                        print(f"After filtering missing {col}: {valid_pairs_mask.sum()} pairs remaining")
             
-            # Add is_cross_dept flag if dept columns exist
+            # Apply the valid pairs mask
+            before_filter = len(similar_df)
+            similar_df = similar_df[valid_pairs_mask]
+            after_filter = len(similar_df)
+            print(f"After filtering incomplete metadata: {after_filter} pairs remaining (removed {before_filter - after_filter} pairs)")
+            
+            # Add cross-department flag if department info is available
             if 'dept_1' in similar_df.columns and 'dept_2' in similar_df.columns:
-                similar_df['is_cross_dept'] = (similar_df['dept_1'] != similar_df['dept_2']) & \
-                                            (~similar_df['dept_1'].isna()) & \
-                                            (~similar_df['dept_2'].isna())
+                similar_df['is_cross_dept'] = similar_df.apply(
+                    lambda row: row['dept_1'] != row['dept_2'] and row['dept_1'] != '' and row['dept_2'] != '',
+                    axis=1
+                )
+                # Prioritize cross-department duplicates in the results
+                similar_df['sort_value'] = similar_df.apply(
+                    lambda row: row['similarity_score'] + (0.1 if row.get('is_cross_dept', False) else 0),
+                    axis=1
+                )
+                similar_df = similar_df.sort_values('sort_value', ascending=False).drop('sort_value', axis=1)
             
-            # Limit number of results after all filtering
-            similar_df = similar_df.head(max_results)
+            # Add cross-source flag if source info is available
+            if 'source_1' in similar_df.columns and 'source_2' in similar_df.columns:
+                similar_df['is_cross_source'] = similar_df.apply(
+                    lambda row: row['source_1'] != row['source_2'] and row['source_1'] != '' and row['source_2'] != '',
+                    axis=1
+                )
+            
+            # Select the most diverse set of pairs for the max_results
+            # We want to include pairs from different departments, sources, etc.
+            if len(similar_df) > max_results:
+                print(f"Selecting most diverse {max_results} course pairs with similarity ≥ {min_similarity}")
+                
+                # Reserve 40% for cross-department pairs (most valuable business insight)
+                cross_dept_pairs = pd.DataFrame()
+                if 'is_cross_dept' in similar_df.columns:
+                    cross_dept_mask = similar_df['is_cross_dept'] == True
+                    if cross_dept_mask.sum() > 0:
+                        # Take a portion of available cross-dept pairs, up to 40% of max_results
+                        cross_dept_count = min(int(max_results * 0.4), cross_dept_mask.sum())
+                        cross_dept_pairs = similar_df[cross_dept_mask].head(cross_dept_count)
+                        print(f"Selected {len(cross_dept_pairs)} cross-department pairs")
+                
+                # Reserve 30% for cross-source pairs (second most valuable)
+                cross_source_pairs = pd.DataFrame()
+                if 'is_cross_source' in similar_df.columns:
+                    # Exclude pairs already in cross_dept_pairs
+                    mask = ~similar_df.index.isin(cross_dept_pairs.index)
+                    cross_source_mask = mask & (similar_df['is_cross_source'] == True)
+                    if cross_source_mask.sum() > 0:
+                        # Take a portion of available cross-source pairs, up to 30% of max_results
+                        cross_source_count = min(int(max_results * 0.3), cross_source_mask.sum())
+                        cross_source_pairs = similar_df[cross_source_mask].head(cross_source_count)
+                        print(f"Selected {len(cross_source_pairs)} cross-source pairs")
+                
+                # Fill the remaining slots with the highest similarity pairs
+                remaining_slots = max_results - len(cross_dept_pairs) - len(cross_source_pairs)
+                mask = ~similar_df.index.isin(cross_dept_pairs.index) & ~similar_df.index.isin(cross_source_pairs.index)
+                remaining_pairs = similar_df[mask].head(remaining_slots)
+                print(f"Selected {len(remaining_pairs)} additional high-similarity pairs")
+                
+                # Combine the selected pairs
+                similar_df = pd.concat([cross_dept_pairs, cross_source_pairs, remaining_pairs])
+                # Re-sort by similarity
+                similar_df = similar_df.sort_values('similarity_score', ascending=False)
             
             print(f"Final similarity DataFrame contains {len(similar_df)} course pairs with similarity ≥ {min_similarity}")
             return similar_df
@@ -405,10 +528,53 @@ def plot_similarity_network(similarity_df: pd.DataFrame,
         # Calculate node positions
         pos = nx.spring_layout(G, k=1/math.sqrt(len(G.nodes())), iterations=50)
         
-        # Create edge traces
+        # Modify the node trace creation to include more metadata
+        node_x = []
+        node_y = []
+        node_text = []
+        node_size = []
+        node_dept = {}
+        node_source = {}
+        
+        # Build richer node information if available
+        for _, row in filtered_edges.iterrows():
+            # Process first course in pair
+            course_id = str(row['course_id_1'])
+            node_dept[course_id] = row.get('dept_1', 'Unknown Dept')
+            node_source[course_id] = row.get('source_1', 'Unknown Source')
+            
+            # Process second course in pair
+            course_id = str(row['course_id_2'])
+            node_dept[course_id] = row.get('dept_2', 'Unknown Dept')
+            node_source[course_id] = row.get('source_2', 'Unknown Source')
+        
+        # Create improved hover texts
+        for node in G.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            
+            # Create rich tooltip with available metadata
+            title = G.nodes[node]['name']
+            dept = node_dept.get(node, "Unknown Dept")
+            source = node_source.get(node, "Unknown Source")
+            connections = G.degree(node)
+            
+            hover_text = f"<b>Course:</b> {title}<br>"
+            hover_text += f"<b>Department:</b> {dept}<br>"
+            hover_text += f"<b>Source:</b> {source}<br>"
+            hover_text += f"<b>Similar Courses:</b> {connections}"
+            
+            node_text.append(hover_text)
+            
+            # Size node based on degree
+            degree = G.degree(node)
+            node_size.append(10 + 5 * degree)
+        
+        # Update edge traces to include hover info
         edge_trace = []
         
-        # Create edges with varying widths based on weight
+        # Create edges with varying widths based on weight and add hover information
         for edge in G.edges(data=True):
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
@@ -417,35 +583,27 @@ def plot_similarity_network(similarity_df: pd.DataFrame,
             # Scale line width based on similarity
             width = 2 + 8 * (weight - min_edge_weight) / (1 - min_edge_weight)
             
-            # Color scale based on weight
+            # Color scale based on weight - green for high similarity, red for lower
             color = f'rgba({int(255 * (1 - weight))}, {int(255 * weight)}, 120, 0.7)'
+            
+            # Create hover text for the edge
+            course1 = G.nodes[edge[0]]['name']
+            course2 = G.nodes[edge[1]]['name']
+            similarity_pct = int(weight * 100)
+            
+            hover_text = f"Similarity: {similarity_pct}%<br>{course1}<br>{course2}"
             
             edge_trace.append(
                 go.Scatter(
                     x=[x0, x1, None],
                     y=[y0, y1, None],
                     line=dict(width=width, color=color),
-                    hoverinfo='none',
+                    hoverinfo='text',
+                    hovertext=hover_text,
                     mode='lines'
                 )
             )
-        
-        # Create node trace
-        node_x = []
-        node_y = []
-        node_text = []
-        node_size = []
-        
-        for node in G.nodes():
-            x, y = pos[node]
-            node_x.append(x)
-            node_y.append(y)
-            node_text.append(G.nodes[node]['name'])
             
-            # Size node based on degree
-            degree = G.degree(node)
-            node_size.append(10 + 5 * degree)
-        
         node_trace = go.Scatter(
             x=node_x,
             y=node_y,
@@ -460,7 +618,7 @@ def plot_similarity_network(similarity_df: pd.DataFrame,
                 colorbar=dict(
                     thickness=15,
                     title=dict(
-                        text='Node Connections',
+                        text='Number of Similar Courses',
                         side='right'
                     ),
                     xanchor='left'
@@ -469,14 +627,29 @@ def plot_similarity_network(similarity_df: pd.DataFrame,
             )
         )
         
-        # Create figure
+        # Update figure with better title and instructions
         fig = go.Figure(
             data=edge_trace + [node_trace],
             layout=go.Layout(
-                title=f'Course Similarity Network (Similarity ≥ {min_edge_weight:.2f})',
+                title={
+                    'text': f'Course Similarity Network (Similarity ≥ {min_edge_weight:.2f})',
+                    'y':0.95,
+                    'x':0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'
+                },
+                annotations=[{
+                    'text': 'Nodes represent courses, lines show similarity. Thicker lines = higher similarity. Hover over nodes and lines for details.',
+                    'showarrow': False,
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'x': 0.5,
+                    'y': 1.02,
+                    'align': 'center'
+                }],
                 showlegend=False,
                 hovermode='closest',
-                margin=dict(b=20, l=5, r=5, t=40),
+                margin=dict(b=20, l=5, r=5, t=80),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 height=600
@@ -516,33 +689,77 @@ def plot_department_similarity_heatmap(similarity_df: pd.DataFrame) -> go.Figure
         fill_value=0
     )
     
+    # Also create a count pivot table to show number of course pairs
+    count_df = dept_sim.pivot_table(
+        index='dept_1', 
+        columns='dept_2', 
+        values='count',
+        fill_value=0
+    )
+    
     # Ensure the matrix is symmetric by adding both directions
     all_depts = sorted(set(pivot_df.index) | set(pivot_df.columns))
     full_matrix = pd.DataFrame(index=all_depts, columns=all_depts, data=0.0)
+    count_matrix = pd.DataFrame(index=all_depts, columns=all_depts, data=0)
     
     for i in all_depts:
         for j in all_depts:
             if i in pivot_df.index and j in pivot_df.columns and not pd.isna(pivot_df.loc[i, j]):
                 full_matrix.loc[i, j] = pivot_df.loc[i, j]
+                count_matrix.loc[i, j] = count_df.loc[i, j] if i in count_df.index and j in count_df.columns else 0
             elif j in pivot_df.index and i in pivot_df.columns and not pd.isna(pivot_df.loc[j, i]):
                 full_matrix.loc[i, j] = pivot_df.loc[j, i]
+                count_matrix.loc[i, j] = count_df.loc[j, i] if j in count_df.index and i in count_df.columns else 0
             elif i == j:
                 full_matrix.loc[i, j] = 1.0  # Self-similarity
+                count_matrix.loc[i, j] = 0  # No need to count self-pairs
     
-    # Create heatmap
-    fig = px.imshow(
-        full_matrix,
-        labels=dict(x="Department", y="Department", color="Avg. Similarity"),
+    # Create hover text with both similarity score and count
+    hover_text = [[f"<b>{row} - {col}</b><br>Avg. Similarity: {full_matrix.loc[row, col]:.2f}<br>Course Pairs: {count_matrix.loc[row, col]}" 
+                  for col in full_matrix.columns] for row in full_matrix.index]
+    
+    # Create heatmap with enhanced tooltips
+    fig = go.Figure(data=go.Heatmap(
+        z=full_matrix.values,
         x=full_matrix.columns,
         y=full_matrix.index,
-        color_continuous_scale="Viridis",
-        title="Content Similarity Between Departments"
-    )
+        colorscale="Viridis",
+        text=hover_text,
+        hoverinfo="text",
+        colorbar=dict(
+            title="Avg. Similarity",
+            titleside="right"
+        )
+    ))
     
+    # Add better explanatory title and annotations
     fig.update_layout(
-        height=600,
+        title={
+            'text': "Content Similarity Between Departments",
+            'y':0.95,
+            'x':0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'
+        },
+        annotations=[{
+            'text': 'Darker colors indicate higher content similarity between departments. Hover to see details.',
+            'showarrow': False,
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 1.02,
+            'align': 'center'
+        }],
+        height=700,
         width=800,
-        xaxis=dict(tickangle=45),
+        xaxis=dict(
+            title="Department",
+            tickangle=45
+        ),
+        yaxis=dict(
+            title="Department"
+        ),
+        margin=dict(t=80, b=100)
     )
     
     return fig

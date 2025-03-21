@@ -1,10 +1,16 @@
+"""LMS Analyzer Application.
+
+This Streamlit application provides a comprehensive analysis of LMS data,
+including content analysis, similarity detection, and optimization features.
+"""
+
 import streamlit as st
 # Must be the first Streamlit command
 st.set_page_config(page_title="LMS Content Analysis", layout="wide")
 
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import io
@@ -12,37 +18,34 @@ from pathlib import Path
 import numpy as np
 import sys
 import os
+import json
+import re
+from collections import defaultdict
+from typing import Dict, List, Tuple, Any, Optional
+from src.utils.similarity import compute_content_similarity
+from src.utils.content_analyzer import ContentAnalyzer
+from src.utils.optimizations import (
+    remove_unnamed_columns,
+    clean_column_names,
+    enhanced_date_repair,
+    process_in_chunks,
+    optimize_memory_usage_enhanced,
+    measure_execution_time,
+    fix_row_count_discrepancy
+)
+from src.utils.visualization import (
+    create_bar_chart,
+    create_line_chart,
+    create_scatter_plot,
+    create_heatmap,
+    create_wordcloud
+)
+from src.models.data_models import VisualizationConfig
 
 # Add src directory to path to allow importing from src.utils
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from lms_content_analyzer import LMSContentAnalyzer
-# Import the new optimization functions
-try:
-    from src.utils.optimizations import (
-        remove_unnamed_columns,
-        clean_column_names,
-        enhanced_date_repair,
-        process_in_chunks,
-        optimize_memory_usage_enhanced,
-        measure_execution_time,
-        fix_row_count_discrepancy
-    )
-    print("Successfully imported optimization utilities")
-except ImportError as e:
-    print(f"Warning: Could not import optimization utilities: {e}")
-    print("Falling back to basic optimization functions")
-    # Define basic fallback functions if imports fail
-    @st.cache_data(ttl=3600)
-    def optimize_memory_usage_enhanced(df):
-        return optimize_memory_usage(df)
-        
-    @st.cache_data(ttl=3600)
-    def enhanced_date_repair(df):
-        return repair_date_fields(df)
-        
-    def measure_execution_time(func):
-        return func
 
 # Performance optimization functions
 @st.cache_data(ttl=3600)
@@ -1331,6 +1334,73 @@ def main():
                     multi_source = len(combined_data[combined_data['cross_reference_count'] > 1])
                     st.metric("Cross-Referenced Courses", f"{multi_source:,}")
             
+            # Enhanced Content Analysis Section
+            st.header("Enhanced Content Analysis")
+            
+            # Initialize content analyzer
+            content_analyzer = ContentAnalyzer()
+            
+            # Run comprehensive analysis
+            with st.spinner("Analyzing course content and patterns..."):
+                insights = content_analyzer.generate_insights(df)
+                figures = content_analyzer.plot_insights(insights)
+            
+            # Display summary insights
+            st.subheader("Key Findings")
+            for finding in insights['summary']['key_findings']:
+                st.info(finding)
+            
+            # Display recommendations
+            st.subheader("Recommendations")
+            for rec in insights['summary']['recommendations']:
+                st.warning(rec)
+            
+            # Display opportunities
+            st.subheader("Opportunities")
+            for opp in insights['summary']['opportunities']:
+                st.success(opp)
+            
+            # Display visualizations in tabs
+            st.subheader("Detailed Analysis")
+            tab1, tab2, tab3 = st.tabs(["Metadata Quality", "Content Patterns", "Department Overlap"])
+            
+            with tab1:
+                if 'metadata_completeness' in figures:
+                    st.plotly_chart(figures['metadata_completeness'], use_container_width=True)
+                st.write("### Metadata Quality Details")
+                for field, stats in insights['metadata_quality']['completeness'].items():
+                    st.write(f"**{field}**:")
+                    st.write(f"- Completeness: {stats['completeness_rate']:.1f}%")
+                    st.write(f"- Unique values: {stats['unique_values']}")
+            
+            with tab2:
+                if 'content_clusters' in figures:
+                    st.plotly_chart(figures['content_clusters'], use_container_width=True)
+                st.write("### Content Pattern Details")
+                if 'keyword_analysis' in insights['content_patterns']:
+                    st.write("**Top Keywords:**")
+                    for keyword, score in insights['content_patterns']['keyword_analysis']['top_keywords'].items():
+                        st.write(f"- {keyword}: {score:.2f}")
+            
+            with tab3:
+                if 'department_overlap' in figures:
+                    st.plotly_chart(figures['department_overlap'], use_container_width=True)
+                st.write("### Department Overlap Details")
+                if 'content_bridges' in insights['cross_department']:
+                    st.write("**Content Bridges Between Departments:**")
+                    for bridge in insights['cross_department']['content_bridges']:
+                        st.write(f"- {bridge['departments'][0]} ↔ {bridge['departments'][1]}")
+                        st.write(f"  Similarity: {bridge['similarity']:.2f}")
+                        st.write(f"  Course counts: {bridge['course_counts'][0]} vs {bridge['course_counts'][1]}")
+            
+            # Add download button for detailed analysis
+            st.download_button(
+                label="Download Detailed Analysis Report",
+                data=json.dumps(insights, indent=2),
+                file_name="content_analysis_report.json",
+                mime="application/json"
+            )
+            
             # Executive Insights Dashboard
             st.header("💡 Executive Insights Dashboard")
             st.markdown("""
@@ -1844,36 +1914,215 @@ def main():
                 if 'tables' in similarity_results and 'potential_duplicates' in similarity_results['tables']:
                     duplicates_df = similarity_results['tables']['potential_duplicates']
                     
-                    # Show filtered version of the dataframe
-                    display_cols = ['title_1', 'title_2', 'similarity_score', 'category_1', 'category_2']
+                    # Create filter controls at the top
+                    st.subheader("Filter Duplicate Results")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    # Add department filter if available
+                    dept_filter = None
+                    if 'dept_1' in duplicates_df.columns and 'dept_2' in duplicates_df.columns:
+                        with col1:
+                            all_depts = sorted(set(
+                                list(duplicates_df['dept_1'].dropna().unique()) + 
+                                list(duplicates_df['dept_2'].dropna().unique())
+                            ))
+                            dept_filter = st.multiselect(
+                                "Filter by Department", 
+                                options=all_depts,
+                                help="Show only duplicates from these departments"
+                            )
+                    
+                    # Add category filter if available 
+                    category_filter = None
+                    if 'category_1' in duplicates_df.columns and 'category_2' in duplicates_df.columns:
+                        with col2:
+                            all_categories = sorted(set(
+                                list(duplicates_df['category_1'].dropna().unique()) + 
+                                list(duplicates_df['category_2'].dropna().unique())
+                            ))
+                            category_filter = st.multiselect(
+                                "Filter by Category",
+                                options=all_categories,
+                                help="Show only duplicates from these categories"
+                            )
+                    
+                    # Add cross-department filter
+                    with col3:
+                        if 'is_cross_dept' in duplicates_df.columns:
+                            cross_dept_filter = st.radio(
+                                "Department Overlap",
+                                options=["All", "Same Department", "Cross-Department"],
+                                horizontal=True,
+                                help="Filter by whether duplicates are from the same or different departments"
+                            )
+                        
+                        similarity_threshold = st.slider(
+                            "Minimum Similarity",
+                            min_value=0.7,
+                            max_value=1.0,
+                            value=0.8,
+                            step=0.05,
+                            help="Show only pairs with similarity above this threshold"
+                        )
+                    
+                    # Apply filters to dataframe
+                    filtered_df = duplicates_df.copy()
+                    
+                    # Apply department filter if selected
+                    if dept_filter:
+                        filtered_df = filtered_df[
+                            filtered_df['dept_1'].isin(dept_filter) | 
+                            filtered_df['dept_2'].isin(dept_filter)
+                        ]
+                    
+                    # Apply category filter if selected
+                    if category_filter:
+                        filtered_df = filtered_df[
+                            filtered_df['category_1'].isin(category_filter) | 
+                            filtered_df['category_2'].isin(category_filter)
+                        ]
+                    
+                    # Apply cross-department filter if selected
+                    if 'is_cross_dept' in filtered_df.columns:
+                        if cross_dept_filter == "Same Department":
+                            filtered_df = filtered_df[filtered_df['is_cross_dept'] == False]
+                        elif cross_dept_filter == "Cross-Department":
+                            filtered_df = filtered_df[filtered_df['is_cross_dept'] == True]
+                    
+                    # Apply similarity threshold
+                    filtered_df = filtered_df[filtered_df['similarity_score'] >= similarity_threshold]
+                    
+                    # Format the similarity score for display
+                    filtered_df['similarity_score'] = filtered_df['similarity_score'].apply(
+                        lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A"
+                    )
+                    
+                    # Define display columns with better names
+                    display_cols = ['title_1', 'title_2', 'similarity_score']
+                    
+                    # Add activity columns if available
+                    if 'activity_1' in filtered_df.columns and 'activity_2' in filtered_df.columns:
+                        display_cols.extend(['activity_1', 'activity_2'])
                     
                     # Add department columns if available
-                    if 'dept_1' in duplicates_df.columns:
-                        display_cols.extend(['dept_1', 'dept_2', 'is_cross_dept'])
+                    if 'dept_1' in filtered_df.columns and 'dept_2' in filtered_df.columns:
+                        display_cols.extend(['dept_1', 'dept_2'])
+                        if 'is_cross_dept' in filtered_df.columns:
+                            display_cols.append('is_cross_dept')
                     
+                    # Add category if available
+                    if 'category_1' in filtered_df.columns and 'category_2' in filtered_df.columns:
+                        display_cols.extend(['category_1', 'category_2'])
+                    
+                    # Add source if available
+                    if 'source_1' in filtered_df.columns and 'source_2' in filtered_df.columns:
+                        display_cols.extend(['source_1', 'source_2'])
+                    
+                    # Create nicer column names for display
+                    display_names = {
+                        'title_1': 'Course 1 Title',
+                        'title_2': 'Course 2 Title',
+                        'similarity_score': 'Similarity',
+                        'dept_1': 'Department 1',
+                        'dept_2': 'Department 2',
+                        'category_1': 'Category 1',
+                        'category_2': 'Category 2',
+                        'activity_1': 'Activity 1',
+                        'activity_2': 'Activity 2',
+                        'source_1': 'Source 1',
+                        'source_2': 'Source 2',
+                        'is_cross_dept': 'Cross-Department'
+                    }
+                    
+                    # Ensure we only include columns that exist
+                    display_cols = [col for col in display_cols if col in filtered_df.columns]
+                    
+                    # Create a copy with renamed columns for display
+                    display_df = filtered_df[display_cols].copy()
+                    display_df.columns = [display_names.get(col, col) for col in display_cols]
+                    
+                    # Display result count
+                    st.write(f"Found **{len(filtered_df)}** potential duplicates matching your criteria")
+                    
+                    # Display the dataframe
                     st.dataframe(
-                        duplicates_df[display_cols].sort_values('similarity_score', ascending=False),
+                        display_df.sort_values('Similarity', ascending=False),
                         use_container_width=True
                     )
                     
-                    # Add download option
-                    csv = duplicates_df.to_csv(index=False)
+                    # Add download option with full data
+                    csv = filtered_df.to_csv(index=False)
                     st.download_button(
-                        "Download Potential Duplicates Data",
+                        "Download Filtered Potential Duplicates",
                         csv,
                         "potential_duplicates.csv",
                         "text/csv"
                     )
                     
-                    st.markdown("""
-                    **Interpreting Potential Duplicates:**
-                    
-                    The table above shows course pairs with high content similarity (≥80%). 
-                    These courses are candidates for review and potential consolidation.
-                    
-                    Prioritize cross-department duplicates, as these may indicate lack of coordination
-                    between different parts of the organization.
-                    """)
+                    # Add metrics about the duplicates
+                    if len(filtered_df) > 0:
+                        st.subheader("Duplicate Analysis")
+                        
+                        metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+                        
+                        with metrics_col1:
+                            avg_similarity = filtered_df['similarity_score'].apply(
+                                lambda x: float(x) if isinstance(x, (float, int)) else 
+                                          float(x) if isinstance(x, str) and x != "N/A" else None
+                            ).mean()
+                            
+                            st.metric(
+                                "Average Similarity", 
+                                f"{avg_similarity:.2f}" if pd.notnull(avg_similarity) else "N/A"
+                            )
+                        
+                        # Display cross-department percentage if available
+                        if 'is_cross_dept' in filtered_df.columns:
+                            with metrics_col2:
+                                cross_dept_count = filtered_df['is_cross_dept'].sum()
+                                cross_dept_pct = cross_dept_count / len(filtered_df) * 100 if len(filtered_df) > 0 else 0
+                                
+                                st.metric(
+                                    "Cross-Department Duplicates",
+                                    f"{cross_dept_count} ({cross_dept_pct:.1f}%)"
+                                )
+                        
+                        # Display most affected departments if available
+                        if 'dept_1' in filtered_df.columns and 'dept_2' in filtered_df.columns:
+                            with metrics_col3:
+                                # Get all departments involved in duplicates
+                                all_affected_depts = pd.Series(
+                                    list(filtered_df['dept_1'].dropna()) + 
+                                    list(filtered_df['dept_2'].dropna())
+                                ).value_counts()
+                                
+                                top_dept = all_affected_depts.index[0] if len(all_affected_depts) > 0 else "N/A"
+                                top_dept_count = all_affected_depts.iloc[0] if len(all_affected_depts) > 0 else 0
+                                
+                                st.metric(
+                                    "Most Affected Department",
+                                    f"{top_dept} ({top_dept_count} courses)"
+                                )
+                        
+                        # Add a few helpful interpretations
+                        st.markdown("""
+                        ### Interpreting Potential Duplicates
+                        
+                        The table above shows course pairs with high content similarity. These courses are candidates for 
+                        review and potential consolidation. Here's how to interpret the results:
+                        
+                        - **Similarity Score**: Higher values (closer to 1.0) indicate greater content overlap
+                        - **Cross-Department**: "True" indicates courses from different departments covering similar material
+                        - **Activity**: Gives insight into which course is more actively used
+                        
+                        **Recommended Actions:**
+                        
+                        1. Start by reviewing the highest similarity pairs (0.90+)
+                        2. Prioritize cross-department duplicates to improve consistency
+                        3. Consider consolidating courses with low activity
+                        4. When consolidating, retain the course with more recent updates or higher quality content
+                        """)
                 else:
                     st.info("No potential duplicates identified in the dataset.")
             
