@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: lms_analyzer
+Version: 0.1.0
+Requires-Python: >=3.8
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: streamlit>=1.30.0
+Requires-Dist: plotly>=5.18.0
+Requires-Dist: matplotlib>=3.8.0
+Requires-Dist: wordcloud>=1.9.0
+Requires-Dist: openpyxl>=3.1.0
+Requires-Dist: python-dateutil>=2.8.0
+Requires-Dist: typing-extensions>=4.8.0
+Dynamic: requires-dist
+Dynamic: requires-python

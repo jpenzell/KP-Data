@@ -1,4 +1,4 @@
-"""Service for processing and standardizing LMS data."""
+"""Data processing service for the LMS Content Analysis Dashboard."""
 
 import pandas as pd
 import numpy as np
@@ -8,54 +8,358 @@ from typing import Any  # Separate import for Any
 from pathlib import Path
 import re
 from scipy import stats
+import logging
+import sys
+from datetime import datetime
 
-from config.constants import (
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'lms_analyzer_{datetime.now().strftime("%Y%m%d")}.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+from .data_validator import DataValidator
+from .data_transformer import DataTransformer
+from ..config.column_mappings import REQUIRED_COLUMNS, COLUMN_TYPES
+from ..config.validation_rules import VALIDATION_RULES
+from ..models.data_models import ValidationResult, AnalysisConfig
+
+from ..config.constants import (
     COLUMN_MAPPING,
     DATE_FIELDS,
     NUMERIC_FIELDS,
     BOOLEAN_FIELDS,
     REQUIRED_FIELDS
 )
-from models.data_models import Course, ValidationResult
+from ..models.data_models import Course, ValidationResult, Severity
 
 class DataProcessor:
-    """Handles data processing and standardization for LMS data."""
+    """Service for processing and validating LMS data."""
     
     def __init__(self):
         """Initialize the data processor."""
+        self.required_columns = [
+            'course_no', 'course_title', 'category_name',
+            'course_description', 'course_type', 'region_entity'
+        ]
         self.validation_results: List[ValidationResult] = []
+        self.validator = DataValidator()
+        self.transformer = DataTransformer()
     
-    def process_excel_files(self, file_paths: List[Union[str, Path]]) -> pd.DataFrame:
+    def process_excel_files(self, uploaded_files: List) -> pd.DataFrame:
         """Process multiple Excel files and combine them into a single DataFrame."""
-        dataframes = []
+        dfs = []
+        file_errors = []
         
-        for file_path in file_paths:
+        for idx, uploaded_file in enumerate(uploaded_files):
             try:
-                print(f"Processing file: {file_path}")  # Debug print
-                df = pd.read_excel(file_path)
-                print(f"Shape after reading: {df.shape}")  # Debug print
-                df['data_source'] = Path(file_path).stem
-                df['cross_reference_count'] = 1
-                dataframes.append(df)
+                # Get the file name for logging
+                file_name = uploaded_file.name
+                
+                # Read Excel file with error handling - use more flexible options
+                try:
+                    df = pd.read_excel(
+                        uploaded_file,
+                        engine='openpyxl',
+                        na_values=['', 'NA', 'N/A', 'null', 'NULL', '#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NA', 'NULL', 'NaN', 'n/a', 'nan', 'null'],
+                        keep_default_na=True,
+                    )
+                except Exception as e:
+                    logger.error(f"Error reading Excel file {file_name}: {str(e)}")
+                    # Try again with different options
+                    try:
+                        df = pd.read_excel(
+                            uploaded_file,
+                            engine='openpyxl',
+                            dtype=str,  # Read everything as strings
+                        )
+                    except Exception as e2:
+                        raise ValueError(f"Could not read Excel file {file_name}: {str(e2)}")
+                
+                # Add source tracking
+                df['data_source'] = file_name
+                
+                # Log file info
+                logger.info(f"Processing file: {file_name}")
+                logger.info(f"Shape: {df.shape}")
+                logger.info(f"Columns: {df.columns.tolist()}")
+                
+                # Clean up unnamed columns - this is critical
+                df = self._cleanup_unnamed_columns(df)
+                
+                # Standardize column names - very important to do this FIRST
+                # Convert column names to lowercase and replace spaces with underscores
+                df.columns = df.columns.str.lower().str.replace(' ', '_', regex=False).str.strip()
+                
+                # Apply specific column mappings using the COLUMN_MAPPING dictionary
+                df = self._apply_column_mappings(df)
+                
+                # Clean up course_no column - CRITICAL
+                if 'course_no' in df.columns:
+                    # Clean up course numbers - remove invalid characters and standardize
+                    df['course_no'] = df['course_no'].astype(str).str.strip()
+                    df['course_no'] = df['course_no'].str.replace(':', '_', regex=False)
+                    df['course_no'] = df['course_no'].str.replace(',', '_', regex=False)
+                    df['course_no'] = df['course_no'].str.replace(' ', '_', regex=False)
+                    df['course_no'] = df['course_no'].str.replace('\u200b', '', regex=False)  # Remove zero-width space
+                    df['course_no'] = df['course_no'].str.replace(r'[^\w\d_-]', '', regex=True)  # Remove other invalid chars
+                
+                # Ensure course_no exists (this is critical for later steps)
+                if 'course_no' not in df.columns:
+                    logger.warning(f"No course_no column found in {file_name}, creating synthetic course numbers")
+                    df['course_no'] = f"file_{idx}_" + df.index.astype(str)
+                
+                # Pre-process version field to avoid validation errors
+                if 'course_version' in df.columns:
+                    df['course_version'] = df['course_version'].astype(str).str.strip()
+                
+                # Pre-process category_name to avoid validation errors
+                if 'category_name' in df.columns:
+                    df['category_name'] = df['category_name'].astype(str).str.strip()
+                    # Replace NaN or empty strings with a default category
+                    mask = (df['category_name'].isna()) | (df['category_name'] == '') | (df['category_name'] == 'nan')
+                    df.loc[mask, 'category_name'] = "Uncategorized"
+                
+                # Pre-process keywords field to avoid validation errors
+                if 'course_keywords' in df.columns:
+                    df['course_keywords'] = df['course_keywords'].astype(str).str.strip()
+                
+                # Clean and standardize data
+                df = self._clean_data(df)
+                
+                # Validate the dataframe
+                validation_results = self.validator.validate_dataframe(df)
+                self.validation_results.extend(validation_results)
+                
+                # Log validation results
+                for result in validation_results:
+                    if result.severity == Severity.ERROR:
+                        logger.error(f"Validation error in {file_name}: {result.message}")
+                    elif result.severity == Severity.WARNING:
+                        logger.warning(f"Validation warning in {file_name}: {result.message}")
+                
+                # Log data quality metrics
+                null_counts = df.isna().sum()
+                logger.info(f"Null value counts:\n{null_counts[null_counts > 0]}")
+                
+                dfs.append(df)
+                logger.info(f"Successfully processed file: {file_name}")
+                
             except Exception as e:
-                print(f"Error reading file {file_path}: {str(e)}")  # Debug print
+                error_msg = f"Error processing file {uploaded_file.name}: {str(e)}"
+                logger.error(error_msg)
+                file_errors.append(error_msg)
                 self.validation_results.append(
                     ValidationResult(
-                        is_valid=False,
-                        errors=[f"Error processing {file_path}: {str(e)}"]
+                        message=error_msg,
+                        severity=Severity.ERROR
                     )
                 )
         
-        if not dataframes:
-            raise ValueError("No valid data files were processed")
+        if not dfs:
+            error_msg = "No valid data found in the uploaded files"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
+        # Combine all dataframes
         try:
-            result = self.merge_and_standardize_data(dataframes)
-            print(f"Final shape: {result.shape}")  # Debug print
-            return result
+            combined_df = pd.concat(dfs, ignore_index=True)
+            logger.info(f"Successfully combined {len(dfs)} dataframes")
+            logger.info(f"Combined shape: {combined_df.shape}")
+            
+            # Remove duplicates based on course number
+            if 'course_no' in combined_df.columns:
+                initial_count = len(combined_df)
+                combined_df = combined_df.drop_duplicates(subset=['course_no'])
+                if len(combined_df) < initial_count:
+                    logger.warning(f"Removed {initial_count - len(combined_df)} duplicate courses")
+            else:
+                logger.warning("No course_no column found in combined dataset")
+            
+            # Clean and standardize data using the transformer
+            combined_df = self.transformer.transform_dataframe(combined_df)
+            logger.info("Successfully transformed combined dataframe")
+            
+            # Log final data quality metrics
+            logger.info(f"Final shape: {combined_df.shape}")
+            logger.info(f"Final columns: {combined_df.columns.tolist()}")
+            logger.info(f"Data types:\n{combined_df.dtypes}")
+            
+            return combined_df
+            
         except Exception as e:
-            print(f"Error in merge_and_standardize_data: {str(e)}")  # Debug print
-            raise
+            error_msg = f"Error combining dataframes: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+    
+    def _cleanup_unnamed_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean up unnamed columns."""
+        # First, identify unnamed columns
+        unnamed_cols = [col for col in df.columns if 'unnamed' in str(col).lower() or not str(col).strip()]
+        
+        # Check if any of these columns have data we care about
+        for col in unnamed_cols:
+            # If the column is empty (all null or empty strings), drop it
+            if df[col].isna().all() or (df[col].astype(str).str.strip() == '').all():
+                df = df.drop(columns=[col])
+            else:
+                # Try to infer a better name for the column
+                if df[col].dtype == 'object':
+                    # Look at non-null values and see if they follow a pattern
+                    sample_values = df[col].dropna().head(10).astype(str).tolist()
+                    # Check for common keywords
+                    keywords = ['course', 'title', 'id', 'date', 'type', 'category', 'region']
+                    detected_keywords = []
+                    
+                    for keyword in keywords:
+                        if any(keyword in value.lower() for value in sample_values):
+                            detected_keywords.append(keyword)
+                    
+                    if detected_keywords:
+                        new_name = f"inferred_{'_'.join(detected_keywords)}"
+                        df = df.rename(columns={col: new_name})
+                    else:
+                        # Use a generic name
+                        new_name = f"data_column_{df.columns.get_loc(col)}"
+                        df = df.rename(columns={col: new_name})
+        
+        return df
+    
+    def _validate_dataframe(self, df: pd.DataFrame, file_name: str) -> None:
+        """Validate the structure and content of a DataFrame."""
+        # Check required columns
+        missing_columns = [col for col in self.required_columns if col not in df.columns]
+        if missing_columns:
+            self.validation_results.append(
+                ValidationResult(
+                    message=f"Missing required columns in {file_name}: {', '.join(missing_columns)}",
+                    severity=Severity.ERROR
+                )
+            )
+        
+        # Check for empty values in required columns
+        for col in self.required_columns:
+            if col in df.columns:
+                empty_count = df[col].isna().sum()
+                if empty_count > 0:
+                    self.validation_results.append(
+                        ValidationResult(
+                            message=f"{empty_count} empty values found in {col} column in {file_name}",
+                            severity=Severity.WARNING,
+                            field=col
+                        )
+                    )
+    
+    def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and standardize the data."""
+        try:
+            # Clean string columns
+            for col in df.select_dtypes(include=['object']).columns:
+                if col in df.columns:
+                    try:
+                        # Only apply string operations if the column has string values
+                        if df[col].notna().any():
+                            # Handle possible mixed types by forcing to string
+                            df[col] = df[col].astype(str)
+                            # Then clean the strings
+                            df[col] = df[col].str.strip()
+                            # Replace 'nan' strings from the astype conversion
+                            df.loc[df[col] == 'nan', col] = None
+                    except Exception as e:
+                        logger.warning(f"Error cleaning string column {col}: {str(e)}")
+            
+            # Convert date columns
+            date_columns = ['course_available_from', 'course_discontinued_from']
+            for col in date_columns:
+                if col in df.columns:
+                    try:
+                        # Handle mixed date formats more robustly
+                        df[col] = self._convert_dates_robustly(df[col])
+                    except Exception as e:
+                        logger.warning(f"Error converting {col} to datetime: {str(e)}")
+            
+            # Convert numeric columns
+            numeric_columns = ['duration_mins', 'learner_count', 'total_2024_activity']
+            for col in numeric_columns:
+                if col in df.columns:
+                    try:
+                        # Clean the column first to handle mixed data
+                        df[col] = df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+                        # Then convert to numeric
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        # Replace NaN with 0 for count columns
+                        if col in ['learner_count', 'total_2024_activity']:
+                            df[col] = df[col].fillna(0)
+                    except Exception as e:
+                        logger.warning(f"Error converting {col} to numeric: {str(e)}")
+            
+            return df
+        
+        except Exception as e:
+            logger.error(f"Error in _clean_data: {str(e)}")
+            # Return the original dataframe if something went wrong
+            return df
+    
+    def _convert_dates_robustly(self, series: pd.Series) -> pd.Series:
+        """Convert a series to datetime using multiple formats."""
+        # First clean the input
+        series = series.astype(str).str.strip()
+        series = series.replace('nan', pd.NA)
+        series = series.replace('None', pd.NA)
+        series = series.replace('', pd.NA)
+        
+        # Try common date formats
+        formats = [
+            '%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d',
+            '%d-%m-%Y', '%m-%d-%Y', '%Y.%m.%d',
+            '%d.%m.%Y', '%m.%d.%Y', '%d %b %Y', '%b %d %Y',
+            '%d %B %Y', '%B %d %Y', '%Y-%m-%d %H:%M:%S'
+        ]
+        
+        result = pd.Series(index=series.index, dtype='object')
+        
+        # Try each format for each value
+        for idx, value in series.items():
+            if pd.isna(value):
+                result[idx] = pd.NaT
+                continue
+                
+            for fmt in formats:
+                try:
+                    date_value = pd.to_datetime(value, format=fmt)
+                    result[idx] = date_value
+                    break
+                except:
+                    pass
+            
+            # If no format worked, use the flexible parser
+            if not isinstance(result[idx], pd.Timestamp):
+                try:
+                    result[idx] = pd.to_datetime(value, errors='coerce')
+                except:
+                    result[idx] = pd.NaT
+        
+        return result
+    
+    def get_validation_results(self) -> List[ValidationResult]:
+        """Get the list of validation results."""
+        return self.validation_results
+    
+    def calculate_basic_metrics(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate basic metrics from the processed data."""
+        return {
+            'total_courses': len(df),
+            'active_courses': len(df[df['course_discontinued_from'].isna()]),
+            'total_learners': df['learner_count'].sum(),
+            'regions_covered': df['region_entity'].nunique(),
+            'data_sources': df['data_source'].nunique(),
+            'cross_referenced_courses': len(df[df['cross_reference_count'] > 1])
+        }
     
     def merge_and_standardize_data(self, dataframes: List[pd.DataFrame]) -> pd.DataFrame:
         """Merge and standardize multiple dataframes with dynamic reconciliation."""
@@ -149,9 +453,6 @@ class DataProcessor:
             # Convert all column names to lowercase and strip whitespace
             df.columns = df.columns.str.lower().str.strip()
             
-            # Print original columns for debugging
-            print(f"Original columns: {df.columns.tolist()}")
-            
             # Create reverse mapping for standardized names
             reverse_mapping = {}
             for original, standard in COLUMN_MAPPING.items():
@@ -170,49 +471,27 @@ class DataProcessor:
                 # Check if column is already a standard name
                 if col_lower in COLUMN_MAPPING.values():
                     target_col = col_lower
-                # Check if column is in original mapping
-                elif col_lower in COLUMN_MAPPING:
-                    target_col = COLUMN_MAPPING[col_lower]
-                # Check if column matches any standard name's variations
+                # Check if column matches any original names
                 else:
-                    for standard, variations in reverse_mapping.items():
-                        if any(variation in col_lower for variation in variations):
+                    for standard, originals in reverse_mapping.items():
+                        if col_lower in originals:
                             target_col = standard
                             break
                 
-                # If no match found, use some common mappings
-                if not target_col:
-                    if 'title' in col_lower and 'course' not in col_lower:
-                        target_col = 'course_title'
-                    elif 'desc' in col_lower:
-                        target_col = 'course_description'
-                    elif 'region' in col_lower:
-                        target_col = 'region_entity'
-                    elif 'duration' in col_lower or 'mins' in col_lower:
-                        target_col = 'duration_mins'
-                    elif 'learner' in col_lower and 'count' in col_lower:
-                        target_col = 'learner_count'
-                    else:
-                        target_col = col  # Keep original name
-                
-                # Handle duplicate target columns
-                if target_col in seen_targets:
-                    suffix = 1
-                    while f"{target_col}_{suffix}" in seen_targets:
-                        suffix += 1
-                    target_col = f"{target_col}_{suffix}"
-                
-                new_mapping[col] = target_col
-                seen_targets.add(target_col)
+                if target_col and target_col not in seen_targets:
+                    new_mapping[col] = target_col
+                    seen_targets.add(target_col)
             
-            # Apply the mapping
+            # Apply the new mapping
             df = df.rename(columns=new_mapping)
             
-            # Print final columns for debugging
-            print(f"Standardized columns: {df.columns.tolist()}")
-            print(f"Applied mappings: {new_mapping}")
+            # Add missing required columns with null values
+            for col in REQUIRED_COLUMNS:
+                if col not in df.columns:
+                    df[col] = None
             
             return df
+            
         except Exception as e:
             print(f"Error standardizing column names: {str(e)}")
             return df
@@ -740,149 +1019,150 @@ class DataProcessor:
         source_counts = df['data_sources_count'].value_counts().sort_index()
         for count, freq in source_counts.items():
             print(f"Courses found in {count} sources: {freq} ({(freq/total_rows)*100:.1f}%)")
-    
-    def get_validation_results(self) -> List[ValidationResult]:
-        """Get the validation results from processing."""
-        return self.validation_results
 
     def _analyze_file_structure(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze the structure of a DataFrame."""
+        """Analyze the structure of a dataframe to determine its type and quality."""
         analysis = {
-            'row_count': 0,
-            'column_count': 0,
-            'columns': [],
-            'columns_analysis': {},
             'file_type': 'unknown',
             'confidence': 0.0,
-            'possible_id_columns': [],
-            'categorical_columns': [],
-            'numeric_columns': [],
-            'date_columns': [],
-            'value_distributions': {},
-            'data_quality': {
-                'null_percentages': {},
-                'unique_percentages': {},
-                'data_types': {}
-            }
+            'column_coverage': 0.0,
+            'data_quality': 0.0
         }
         
-        try:
-            # Basic information
-            analysis['row_count'] = len(df)
-            analysis['column_count'] = len(df.columns)
-            analysis['columns'] = df.columns.tolist()
+        # Calculate column coverage
+        required_cols = set(REQUIRED_COLUMNS)
+        present_cols = set(df.columns)
+        coverage = len(required_cols.intersection(present_cols)) / len(required_cols)
+        analysis['column_coverage'] = coverage
+        
+        # Determine file type based on column patterns
+        if all(col in df.columns for col in ['course_no', 'course_title', 'category_name']):
+            analysis['file_type'] = 'course_catalog'
+            analysis['confidence'] = 0.9
+        elif all(col in df.columns for col in ['learner_count', 'total_2024_activity']):
+            analysis['file_type'] = 'activity_data'
+            analysis['confidence'] = 0.8
+        elif all(col in df.columns for col in ['course_available_from', 'course_discontinued_from']):
+            analysis['file_type'] = 'course_schedule'
+            analysis['confidence'] = 0.7
+        
+        # Calculate data quality score
+        quality_score = 0.0
+        if not df.empty:
+            # Check for missing values
+            missing_ratio = df.isna().mean().mean()
+            quality_score = 1 - missing_ratio
             
-            # Detect file type and confidence
-            file_type_scores = {
-                'course_data': 0,
-                'activity_data': 0,
-                'regional_data': 0,
-                'reference_data': 0
+            # Check for data consistency
+            if 'course_no' in df.columns:
+                unique_ratio = df['course_no'].nunique() / len(df)
+                quality_score = (quality_score + unique_ratio) / 2
+        
+        analysis['data_quality'] = quality_score
+        return analysis
+
+    def _determine_merge_strategy(self, df: pd.DataFrame, analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Determine the best merge strategy based on file analysis."""
+        strategy = {
+            'merge_type': 'unknown',
+            'confidence': 0.0,
+            'merge_keys': [],
+            'aggregation_rules': {}
+        }
+        
+        # Determine merge keys based on file type
+        if analysis['file_type'] == 'course_catalog':
+            strategy['merge_type'] = 'primary'
+            strategy['merge_keys'] = ['course_no']
+            strategy['confidence'] = 0.9
+        elif analysis['file_type'] == 'activity_data':
+            strategy['merge_type'] = 'activity'
+            strategy['merge_keys'] = ['course_no']
+            strategy['aggregation_rules'] = {
+                'learner_count': 'sum',
+                'total_2024_activity': 'sum'
             }
+            strategy['confidence'] = 0.8
+        elif analysis['file_type'] == 'course_schedule':
+            strategy['merge_type'] = 'schedule'
+            strategy['merge_keys'] = ['course_no']
+            strategy['confidence'] = 0.7
+        
+        return strategy
+
+    def _process_single_dataframe_v2(
+        self,
+        df: pd.DataFrame,
+        merge_keys: List[str],
+        aggregation_rules: Dict[str, str],
+        column_sources: Dict[str, List[str]]
+    ) -> pd.DataFrame:
+        """Process a single dataframe according to the merge strategy."""
+        processed_df = df.copy()
+        
+        # Standardize column names
+        processed_df = self._standardize_column_names_v2(processed_df)
+        
+        # Apply aggregation rules if any
+        if aggregation_rules:
+            processed_df = processed_df.groupby(merge_keys).agg(aggregation_rules).reset_index()
+        
+        # Track column sources
+        for col in processed_df.columns:
+            if col not in column_sources:
+                column_sources[col] = []
+            column_sources[col].append(processed_df['data_source'].iloc[0] if 'data_source' in processed_df.columns else 'unknown')
+        
+        return processed_df
+
+    def _standardize_column_names_v2(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Standardize column names using the mapping."""
+        try:
+            # Convert all column names to lowercase and strip whitespace
+            df.columns = df.columns.str.lower().str.strip()
             
-            # Analyze each column
-            column_analysis = {}
+            # Create reverse mapping for standardized names
+            reverse_mapping = {}
+            for original, standard in COLUMN_MAPPING.items():
+                if standard not in reverse_mapping:
+                    reverse_mapping[standard] = []
+                reverse_mapping[standard].append(original.lower())
+            
+            # Create new mapping based on actual columns
+            new_mapping = {}
+            seen_targets = set()  # Track already mapped target columns
+            
             for col in df.columns:
-                try:
-                    # Ensure we're working with a Series, not a DataFrame
-                    series = df[col].squeeze() if isinstance(df[col], pd.DataFrame) else df[col]
-                    
-                    column_info = {
-                        'dtype': str(series.dtype),
-                        'null_count': series.isna().sum(),
-                        'null_percentage': (series.isna().sum() / len(df)) * 100,
-                        'unique_count': series.nunique(),
-                        'unique_percentage': (series.nunique() / len(df)) * 100
-                    }
-                    
-                    # Track column type
-                    if pd.api.types.is_string_dtype(series):
-                        analysis['categorical_columns'].append(col)
-                        non_null_series = series.dropna()
-                        if len(non_null_series) > 0:
-                            column_info.update({
-                                'avg_length': non_null_series.str.len().mean(),
-                                'max_length': non_null_series.str.len().max(),
-                                'sample_values': non_null_series.head().tolist()
-                            })
-                            
-                            # Update file type scores based on column content
-                            if 'course' in col.lower():
-                                file_type_scores['course_data'] += 1
-                            if 'activity' in col.lower() or 'completion' in col.lower():
-                                file_type_scores['activity_data'] += 1
-                            if 'region' in col.lower() or 'entity' in col.lower():
-                                file_type_scores['regional_data'] += 1
-                    
-                    elif pd.api.types.is_numeric_dtype(series):
-                        analysis['numeric_columns'].append(col)
-                        non_null_series = series.dropna()
-                        if len(non_null_series) > 0:
-                            column_info.update({
-                                'min': float(non_null_series.min()),
-                                'max': float(non_null_series.max()),
-                                'mean': float(non_null_series.mean()),
-                                'median': float(non_null_series.median()),
-                                'std': float(non_null_series.std()),
-                                'sample_values': non_null_series.head().tolist()
-                            })
-                    
-                    elif pd.api.types.is_datetime64_any_dtype(series):
-                        analysis['date_columns'].append(col)
-                        non_null_series = series.dropna()
-                        if len(non_null_series) > 0:
-                            column_info.update({
-                                'min_date': non_null_series.min().isoformat(),
-                                'max_date': non_null_series.max().isoformat(),
-                                'sample_values': [d.isoformat() for d in non_null_series.head()]
-                            })
-                    
-                    # Check for potential ID columns
-                    if column_info['unique_percentage'] > 80 and column_info['null_percentage'] < 20:
-                        analysis['possible_id_columns'].append({
-                            'column': col,
-                            'confidence': column_info['unique_percentage'] / 100,
-                            'unique_percentage': column_info['unique_percentage']
-                        })
-                    
-                    # Store value distributions for categorical columns
-                    if column_info['unique_count'] < 100 and column_info['null_percentage'] < 50:
-                        value_counts = series.value_counts(normalize=True).head(10).to_dict()
-                        analysis['value_distributions'][col] = value_counts
-                    
-                    # Store data quality metrics
-                    analysis['data_quality']['null_percentages'][col] = column_info['null_percentage']
-                    analysis['data_quality']['unique_percentages'][col] = column_info['unique_percentage']
-                    analysis['data_quality']['data_types'][col] = column_info['dtype']
-                    
-                    column_analysis[col] = column_info
-                except Exception as e:
-                    print(f"Error analyzing column {col}: {str(e)}")
-                    column_analysis[col] = {
-                        'error': str(e),
-                        'dtype': 'unknown',
-                        'null_count': df[col].isna().sum()
-                    }
+                col_lower = col.lower()
+                target_col = None
+                
+                # Check if column is already a standard name
+                if col_lower in COLUMN_MAPPING.values():
+                    target_col = col_lower
+                # Check if column matches any original names
+                else:
+                    for standard, originals in reverse_mapping.items():
+                        if col_lower in originals:
+                            target_col = standard
+                            break
+                
+                if target_col and target_col not in seen_targets:
+                    new_mapping[col] = target_col
+                    seen_targets.add(target_col)
             
-            analysis['columns_analysis'] = column_analysis
+            # Apply the new mapping
+            df = df.rename(columns=new_mapping)
             
-            # Determine file type and confidence
-            max_score = max(file_type_scores.values())
-            if max_score > 0:
-                analysis['file_type'] = max(
-                    file_type_scores.items(),
-                    key=lambda x: x[1]
-                )[0]
-                analysis['confidence'] = min(max_score / 3, 1.0)  # Normalize confidence
-            else:
-                analysis['file_type'] = 'unknown'
-                analysis['confidence'] = 0.5
+            # Add missing required columns with null values
+            for col in REQUIRED_COLUMNS:
+                if col not in df.columns:
+                    df[col] = None
             
-            return analysis
+            return df
             
         except Exception as e:
-            print(f"Error analyzing file structure: {str(e)}")
-            return analysis
+            print(f"Error standardizing column names: {str(e)}")
+            return df
 
     def _detect_text_patterns(self, series: pd.Series) -> Dict[str, float]:
         """Detect common patterns in text data."""
@@ -1014,120 +1294,6 @@ class DataProcessor:
             print(f"Error identifying join opportunities: {str(e)}")
             return []
 
-    def _determine_merge_strategy(self, df: pd.DataFrame, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Determine how to merge this dataframe based on its structure."""
-        strategy = {
-            'merge_keys': [],
-            'merge_type': 'direct',  # direct, composite, or derived
-            'confidence': 0.0,
-            'aggregation_rules': {},
-            'error': None
-        }
-        
-        try:
-            # First try to use ID columns if available
-            if analysis.get('possible_id_columns'):
-                # Sort by confidence and uniqueness
-                id_columns = sorted(
-                    analysis['possible_id_columns'],
-                    key=lambda x: (x['confidence'], x['unique_percentage']),
-                    reverse=True
-                )
-                
-                # Use the best ID column
-                best_id = id_columns[0]
-                strategy.update({
-                    'merge_keys': [best_id['column']],
-                    'merge_type': 'direct',
-                    'confidence': best_id['confidence']
-                })
-            
-            # If no good ID columns, try composite keys based on file type
-            elif analysis.get('file_type') == 'regional_data':
-                region_cols = [
-                    col for col in analysis['categorical_columns']
-                    if 'region' in col.lower() or 'entity' in col.lower()
-                ]
-                
-                if region_cols:
-                    strategy.update({
-                        'merge_keys': region_cols[:1],  # Use first region column
-                        'merge_type': 'composite',
-                        'confidence': 0.7
-                    })
-                    
-                    # Add duration if available for more precise matching
-                    duration_cols = [
-                        col for col in analysis['numeric_columns']
-                        if 'duration' in col.lower() or 'mins' in col.lower()
-                    ]
-                    if duration_cols:
-                        strategy['merge_keys'].append(duration_cols[0])
-                        strategy['confidence'] = 0.8
-            
-            # Fallback to title-based matching
-            elif any('title' in col.lower() for col in analysis['categorical_columns']):
-                title_col = next(
-                    col for col in analysis['categorical_columns']
-                    if 'title' in col.lower()
-                )
-                strategy.update({
-                    'merge_keys': [title_col],
-                    'merge_type': 'derived',
-                    'confidence': 0.5
-                })
-            
-            # Determine aggregation rules for each column
-            for col in df.columns:
-                if col in strategy['merge_keys']:
-                    continue
-                
-                if col in ['data_source', 'cross_reference_count']:
-                    continue
-                
-                # Numeric columns
-                if col in analysis.get('numeric_columns', []):
-                    if any(term in col.lower() for term in ['count', 'total', 'sum', 'activity']):
-                        strategy['aggregation_rules'][col] = {
-                            'method': 'sum',
-                            'confidence': 0.9
-                        }
-                    else:
-                        strategy['aggregation_rules'][col] = {
-                            'method': 'mean',
-                            'confidence': 0.8
-                        }
-                
-                # Date columns
-                elif col in analysis.get('date_columns', []):
-                    strategy['aggregation_rules'][col] = {
-                        'method': 'most_recent',
-                        'confidence': 0.7
-                    }
-                
-                # Categorical columns
-                elif col in analysis.get('categorical_columns', []):
-                    if analysis['data_quality']['unique_percentages'].get(col, 100) > 80:
-                        # High cardinality - keep first non-null
-                        strategy['aggregation_rules'][col] = {
-                            'method': 'first',
-                            'confidence': 0.6
-                        }
-                    else:
-                        # Low cardinality - concatenate unique values
-                        strategy['aggregation_rules'][col] = {
-                            'method': 'concatenate',
-                            'params': {'separator': ' | ', 'unique': True},
-                            'confidence': 0.7
-                        }
-            
-            return strategy
-            
-        except Exception as e:
-            print(f"Error determining merge strategy: {str(e)}")
-            strategy['error'] = str(e)
-            return strategy
-
     def calculate_quality_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate quality scores for each course."""
         try:
@@ -1175,4 +1341,74 @@ class DataProcessor:
             return df
         except Exception as e:
             print(f"Error calculating quality scores: {str(e)}")
-            return df 
+            return df
+
+    def _apply_column_mappings(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply specific column mappings to standardize column names."""
+        # Common column name mappings
+        mapping_dict = {
+            'course_number': 'course_no',
+            'course_id': 'course_no',
+            'id': 'course_no',
+            'course_code': 'course_no',
+            'template_no': 'course_no',
+            'offering_template_no': 'course_no',
+            'offering_no': 'course_no',
+            
+            'title': 'course_title',
+            'name': 'course_title',
+            'course_name': 'course_title',
+            
+            'description': 'course_description',
+            'summary': 'course_description',
+            'abstract': 'course_abstract',
+            
+            'version': 'course_version',
+            'ver': 'course_version',
+            
+            'category': 'category_name',
+            'cat': 'category_name',
+            'subject': 'category_name',
+            
+            'keywords': 'course_keywords',
+            'tags': 'course_keywords',
+            'key_words': 'course_keywords',
+            
+            'course_from': 'course_available_from',
+            'available_from': 'course_available_from',
+            'start_date': 'course_available_from',
+            'from_date': 'course_available_from',
+            
+            'course_to': 'course_discontinued_from',
+            'discontinued_from': 'course_discontinued_from',
+            'end_date': 'course_discontinued_from',
+            'to_date': 'course_discontinued_from',
+            
+            'region': 'region_entity',
+            'entity': 'region_entity',
+            'business_unit': 'region_entity',
+            
+            'type': 'course_type',
+            'format': 'course_type',
+            'delivery_mode': 'course_type',
+            
+            'duration': 'duration_mins',
+            'length': 'duration_mins',
+            'minutes': 'duration_mins',
+            
+            'learners': 'learner_count',
+            'students': 'learner_count',
+            'participants': 'learner_count',
+            'enrollment': 'learner_count',
+            
+            'activity': 'total_2024_activity',
+            'completions': 'total_2024_activity',
+            'total_activity': 'total_2024_activity'
+        }
+        
+        # Apply the mappings
+        for old_col, new_col in mapping_dict.items():
+            if old_col in df.columns and new_col not in df.columns:
+                df = df.rename(columns={old_col: new_col})
+        
+        return df 

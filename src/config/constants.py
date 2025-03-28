@@ -1,6 +1,6 @@
 """Constants and configuration values for the LMS Analyzer application."""
 
-from typing import Dict, List
+from typing import Dict, List, Union
 
 # Training Categories and Keywords
 TRAINING_CATEGORIES: Dict[str, List[str]] = {
@@ -151,7 +151,48 @@ COLUMN_MAPPING: Dict[str, str] = {
     'type': 'course_type',
     'course type': 'course_type',
     'person_type': 'person_type',
-    'learner_type': 'person_type'
+    'learner_type': 'person_type',
+    
+    # New mappings from source to standardized names
+    'course number': 'course_no',
+    'course id': 'course_no',
+    'offering template number': 'course_no',
+    'course name': 'course_title',
+    'title': 'course_title',
+    'name': 'course_title',
+    'description': 'course_description',
+    'category': 'category_name',
+    'course category': 'category_name',
+    'type': 'course_type',
+    'course type': 'course_type',
+    'department': 'region_entity',
+    'region': 'region_entity',
+    'entity': 'region_entity',
+    'business unit': 'region_entity',
+    
+    # Dates and duration
+    'available from': 'course_available_from',
+    'start date': 'course_available_from',
+    'discontinued from': 'course_discontinued_from',
+    'end date': 'course_discontinued_from',
+    'duration': 'duration_mins',
+    'minutes': 'duration_mins',
+    
+    # Activity metrics
+    'learners': 'learner_count',
+    'learner count': 'learner_count',
+    'number of learners': 'learner_count',
+    'activity': 'total_2024_activity',
+    'total activity': 'total_2024_activity',
+    '2024 activity': 'total_2024_activity',
+    
+    # Metadata
+    'keywords': 'course_keywords',
+    'tags': 'course_keywords',
+    'version': 'course_version',
+    'created by': 'course_created_by',
+    'data source': 'data_source',
+    'source': 'data_source'
 }
 
 # Quality Score Weights
@@ -166,14 +207,18 @@ REQUIRED_FIELDS: List[str] = [
     'course_title',
     'course_description',
     'course_no',
-    'category_name'
+    'category_name',
+    'course_type',
+    'region_entity'
 ]
 
 # Date Fields for Standardization
 DATE_FIELDS: List[str] = [
     'course_version',
     'course_available_from',
-    'course_discontinued_from'
+    'course_discontinued_from',
+    'last_updated',
+    'created_date'
 ]
 
 # Numeric Fields for Standardization
@@ -183,7 +228,8 @@ NUMERIC_FIELDS: List[str] = [
     'cross_reference_count',
     'total_2024_activity',
     'avg_hours_per_completion',
-    'course_duration_hours'
+    'course_duration_hours',
+    'completion_rate'
 ]
 
 # Boolean Fields for Standardization
@@ -198,11 +244,14 @@ BOOLEAN_FIELDS: List[str] = [
     'is_nursing',
     'is_pharmacy',
     'is_safety',
-    'has_direct_reports'
+    'has_direct_reports',
+    'is_active',
+    'is_certified',
+    'is_mandatory'
 ]
 
 # Missing Data Options
-MISSING_DATA_OPTIONS: Dict[str, Dict[str, Dict[str, str | int | float]]] = {
+MISSING_DATA_OPTIONS: Dict[str, Dict[str, Dict[str, Union[str, int, float]]]] = {
     'financial': {
         'cost': {'default': 500, 'description': 'Average cost per course'},
         'cost_per_learner': {'default': 50, 'description': 'Average cost per learner'},
@@ -216,5 +265,47 @@ MISSING_DATA_OPTIONS: Dict[str, Dict[str, Dict[str, str | int | float]]] = {
     'learning': {
         'duration_mins': {'default': 60, 'description': 'Average course duration (minutes)'},
         'learner_count': {'default': 100, 'description': 'Average learners per course'}
+    },
+    'numeric': {
+        'fill_zero': {
+            'description': 'Fill with zero',
+            'default': 0
+        },
+        'fill_mean': {
+            'description': 'Fill with mean value',
+            'strategy': 'mean'
+        },
+        'fill_median': {
+            'description': 'Fill with median value',
+            'strategy': 'median'
+        }
+    },
+    'text': {
+        'fill_empty': {
+            'description': 'Fill with empty string',
+            'default': ''
+        },
+        'fill_unknown': {
+            'description': 'Fill with "Unknown"',
+            'default': 'Unknown'
+        },
+        'fill_na': {
+            'description': 'Fill with "N/A"',
+            'default': 'N/A'
+        }
+    },
+    'date': {
+        'fill_today': {
+            'description': 'Fill with current date',
+            'strategy': 'today'
+        },
+        'fill_min': {
+            'description': 'Fill with minimum date',
+            'strategy': 'min'
+        },
+        'fill_max': {
+            'description': 'Fill with maximum date',
+            'strategy': 'max'
+        }
     }
 } 
