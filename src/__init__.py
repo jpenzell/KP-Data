@@ -1,21 +1,29 @@
-"""LMS Analyzer package."""
+"""LMS Content Analysis Dashboard package."""
 
-from .models import VisualizationConfig
-from .utils import (
-    compute_content_similarity,
-    create_bar_chart,
-    create_line_chart,
-    create_scatter_plot,
-    create_heatmap,
-    create_wordcloud
+__version__ = "1.0.0"
+
+from .models.data_models import (
+    AnalysisResults,
+    ValidationResult,
+    QualityMetrics,
+    ActivityMetrics,
+    SimilarityMetrics,
+    Recommendation,
+    Alert,
+    Course,
+    Severity,
+    VisualizationConfig
 )
 
 __all__ = [
-    'VisualizationConfig',
-    'compute_content_similarity',
-    'create_bar_chart',
-    'create_line_chart',
-    'create_scatter_plot',
-    'create_heatmap',
-    'create_wordcloud'
+    'AnalysisResults',
+    'ValidationResult',
+    'QualityMetrics',
+    'ActivityMetrics',
+    'SimilarityMetrics',
+    'Recommendation',
+    'Alert',
+    'Course',
+    'Severity',
+    'VisualizationConfig'
 ] 

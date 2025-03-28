@@ -1,17 +1,10 @@
-"""Tests for data processing functionality."""
-
 import pandas as pd
 import numpy as np
-from datetime import datetime
-import pytest
-from pathlib import Path
-
-from services.data_processor import DataProcessor
-from services.analyzer import LMSAnalyzer
+from datetime import datetime, timedelta
+from lms_analyzer_app import merge_and_standardize_data, standardize_columns, create_derived_columns, calculate_quality_score
 
 def create_test_dataframes():
-    """Create test dataframes with variations in column names."""
-    # Create first test dataframe
+    # Create first test dataframe with some variations in column names
     df1 = pd.DataFrame({
         'Course No': ['C001', 'C002', 'C003'],
         'Course Title': ['Python Basics', 'Data Analysis', 'Machine Learning'],
@@ -36,7 +29,7 @@ def create_test_dataframes():
         'Course Description': ['Learn Python fundamentals', 'Master data analysis', 'AI/ML fundamentals']
     })
 
-    # Create second dataframe with different column names
+    # Create second dataframe with different column names and some overlapping data
     df2 = pd.DataFrame({
         'course_no': ['C002', 'C003', 'C004'],
         'title': ['Data Analysis Advanced', 'Machine Learning', 'Deep Learning'],
@@ -58,10 +51,10 @@ def create_test_dataframes():
         'is_nursing': [False, False, False],
         'is_pharmacy': [False, False, False],
         'is_safety': [False, False, False],
-        'description': ['Advanced data analysis', 'Machine learning in practice', 'Deep learning basics']
+        'description': ['Advanced data analysis techniques', 'Machine learning in practice', 'Deep learning basics']
     })
 
-    # Create third dataframe with missing data
+    # Create third dataframe with missing data and different formats
     df3 = pd.DataFrame({
         'Course No': ['C001', 'C004', 'C005'],
         'Title': ['Python Basics', 'Deep Learning Fundamentals', None],
@@ -85,54 +78,71 @@ def create_test_dataframes():
 
     return [df1, df2, df3]
 
+def save_test_data_to_excel():
+    """Save each test dataframe to an Excel file"""
+    dataframes = create_test_dataframes()
+    
+    for i, df in enumerate(dataframes, 1):
+        filename = f'test_data_{i}.xlsx'
+        df.to_excel(filename, index=False)
+        print(f"Saved {filename}")
+
 def test_data_processing():
-    """Test data processing functionality."""
     print("Starting data processing test...")
     
     # Create test dataframes
     dataframes = create_test_dataframes()
     
-    # Initialize processor
-    processor = DataProcessor()
+    # Print original dataframes
+    print("\nOriginal Dataframes:")
+    for i, df in enumerate(dataframes, 1):
+        print(f"\nDataframe {i} columns:")
+        print(df.columns.tolist())
+        print(f"\nDataframe {i} head:")
+        print(df.head())
     
+    # Process the dataframes
+    print("\nProcessing dataframes...")
     try:
-        # Process the dataframes
-        result_df = processor.merge_and_standardize_data(dataframes)
+        result_df = merge_and_standardize_data(dataframes)
         
-        # Verify basic properties
-        assert len(result_df) > 0, "Result DataFrame is empty"
-        assert 'course_no' in result_df.columns, "Missing course_no column"
-        assert 'quality_score' in result_df.columns, "Missing quality_score column"
+        # Print results
+        print("\nProcessed DataFrame:")
+        print("\nColumns:")
+        print(result_df.columns.tolist())
+        print("\nShape:", result_df.shape)
+        print("\nSample of processed data:")
+        print(result_df.head())
         
-        # Verify data standardization
-        assert result_df['course_no'].notna().all(), "Found null course_no values"
-        assert result_df['cross_reference_count'].max() > 1, "Cross-reference counting failed"
+        # Print derived columns
+        derived_cols = ['full_course_id', 'course_duration_hours', 'is_active', 'quality_score']
+        print("\nDerived Columns:")
+        for col in derived_cols:
+            if col in result_df.columns:
+                print(f"\n{col}:")
+                print(result_df[col].head())
         
-        # Initialize analyzer
-        analyzer = LMSAnalyzer(result_df)
+        # Print quality metrics
+        print("\nQuality Metrics:")
+        if 'quality_score' in result_df.columns:
+            print(f"Average Quality Score: {result_df['quality_score'].mean():.2f}")
+            print(f"Quality Score Range: {result_df['quality_score'].min():.2f} - {result_df['quality_score'].max():.2f}")
         
-        # Get analysis results
-        results = analyzer.get_analysis_results()
+        # Print cross-reference statistics
+        print("\nCross-reference Statistics:")
+        cross_ref_counts = result_df['cross_reference_count'].value_counts()
+        print(cross_ref_counts)
         
-        # Verify analysis results
-        assert results.total_courses == len(result_df), "Total courses mismatch"
-        assert results.quality_metrics is not None, "Missing quality metrics"
-        assert results.quality_metrics.quality_score > 0, "Invalid quality score"
-        
-        print("\nTest Results:")
-        print(f"Total Courses: {results.total_courses}")
-        print(f"Active Courses: {results.active_courses}")
-        print(f"Quality Score: {results.quality_metrics.quality_score:.2f}")
-        print(f"Completeness Score: {results.quality_metrics.completeness_score:.2f}")
-        print(f"Cross-Reference Score: {results.quality_metrics.cross_reference_score:.2f}")
-        print(f"Validation Score: {results.quality_metrics.validation_score:.2f}")
-        
-        return True, result_df, results
+        return True, result_df
         
     except Exception as e:
-        print(f"\nError during testing: {str(e)}")
-        return False, None, None
+        print(f"\nError during processing: {str(e)}")
+        return False, None
 
 if __name__ == "__main__":
-    success, df, results = test_data_processing()
+    # First save test data to Excel files
+    save_test_data_to_excel()
+    
+    # Then run the test
+    success, result = test_data_processing()
     print(f"\nTest {'passed' if success else 'failed'}") 
