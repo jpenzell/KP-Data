@@ -28,6 +28,7 @@ from .data_transformer import DataTransformer
 from ..config.column_mappings import REQUIRED_COLUMNS, COLUMN_TYPES
 from ..config.validation_rules import VALIDATION_RULES
 from ..models.data_models import ValidationResult, AnalysisConfig
+from ..utils.text_processing import standardize_course_number
 
 from ..config.constants import (
     COLUMN_MAPPING,
@@ -108,11 +109,21 @@ class DataProcessor:
                     df['course_no'] = df['course_no'].str.replace(' ', '_', regex=False)
                     df['course_no'] = df['course_no'].str.replace('\u200b', '', regex=False)  # Remove zero-width space
                     df['course_no'] = df['course_no'].str.replace(r'[^\w\d_-]', '', regex=True)  # Remove other invalid chars
+                    
+                    # Add standardized course number columns for better matching
+                    df['standardized_course_no'] = df['course_no'].apply(
+                        lambda x: standardize_course_number(x)[0]
+                    )
+                    df['numeric_course_id'] = df['course_no'].apply(
+                        lambda x: standardize_course_number(x)[1]
+                    )
                 
                 # Ensure course_no exists (this is critical for later steps)
                 if 'course_no' not in df.columns:
                     logger.warning(f"No course_no column found in {file_name}, creating synthetic course numbers")
                     df['course_no'] = f"file_{idx}_" + df.index.astype(str)
+                    df['standardized_course_no'] = df['course_no']
+                    df['numeric_course_id'] = ""
                 
                 # Pre-process version field to avoid validation errors
                 if 'course_version' in df.columns:
@@ -175,11 +186,43 @@ class DataProcessor:
             # Remove duplicates based on course number
             if 'course_no' in combined_df.columns:
                 initial_count = len(combined_df)
-                combined_df = combined_df.drop_duplicates(subset=['course_no'])
-                if len(combined_df) < initial_count:
-                    logger.warning(f"Removed {initial_count - len(combined_df)} duplicate courses")
-            else:
-                logger.warning("No course_no column found in combined dataset")
+                # Store information about duplicates before removal
+                duplicates_info = combined_df[combined_df.duplicated(subset=['course_no'], keep=False)].copy()
+                if not duplicates_info.empty:
+                    # Group duplicates by course number
+                    duplicate_groups = duplicates_info.groupby('course_no')
+                    logger.info(f"Found {len(duplicate_groups)} courses with duplicates")
+                    
+                    # Log details about each duplicate group
+                    for course_no, group in duplicate_groups:
+                        if len(group) > 1:
+                            logger.info(f"\nDuplicate group for course {course_no}:")
+                            for idx, row in group.iterrows():
+                                logger.info(f"  - Row {idx}:")
+                                logger.info(f"    Title: {row.get('course_title', 'Unknown')}")
+                                logger.info(f"    Source: {row.get('data_source', 'Unknown')}")
+                                logger.info(f"    Version: {row.get('course_version', 'Unknown')}")
+                                logger.info(f"    Created By: {row.get('course_created_by', 'Unknown')}")
+                                logger.info(f"    Available From: {row.get('course_available_from', 'Unknown')}")
+                                logger.info(f"    Discontinued From: {row.get('course_discontinued_from', 'Unknown')}")
+                                logger.info(f"    Category: {row.get('category_name', 'Unknown')}")
+                                logger.info("    ---")
+                    
+                    # Remove duplicates, keeping the most recent version
+                    combined_df = combined_df.sort_values('course_available_from', ascending=False)
+                    combined_df = combined_df.drop_duplicates(subset=['course_no'], keep='first')
+                    
+                    removed_count = initial_count - len(combined_df)
+                    logger.warning(f"Removed {removed_count} duplicate courses")
+                    
+                    # Store duplicate information in the class for later access
+                    self.duplicate_removal_info = {
+                        'total_duplicates': removed_count,
+                        'duplicate_groups': len(duplicate_groups),
+                        'duplicate_details': duplicates_info.to_dict('records')
+                    }
+                else:
+                    logger.info("No duplicates found in the dataset")
             
             # Clean and standardize data using the transformer
             combined_df = self.transformer.transform_dataframe(combined_df)

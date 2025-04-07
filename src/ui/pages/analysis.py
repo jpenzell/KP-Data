@@ -23,7 +23,7 @@ def render_analysis_page(results: AnalysisResults):
         render_activity_analysis(results)
     
     with tab3:
-        render_similarity_analysis(results)
+        render_similarity_analysis(st, results.analyzer, results.courses_df)
     
     with tab4:
         render_recommendations(results)
@@ -167,27 +167,48 @@ def render_activity_analysis(results: AnalysisResults):
     else:
         st.info("No activity recommendations available")
 
-def render_similarity_analysis(results: AnalysisResults):
+def render_similarity_analysis(st, analyzer, courses_df):
     """Render similarity analysis section."""
-    st.header("🔍 Content Similarity Analysis")
+    st.header("Content Similarity Analysis")
     
-    if not results.similarity_metrics:
-        st.info("No similarity metrics available.")
+    if not hasattr(analyzer, 'similarity_metrics') or analyzer.similarity_metrics is None:
+        st.warning("No similarity metrics available. Please run the analysis first.")
         return
     
-    # Display key metrics
-    metrics = results.similarity_metrics
-    col1, col2 = st.columns(2)
+    # Calculate total course pairs
+    total_courses = len(courses_df)
+    total_possible_pairs = total_courses * (total_courses - 1) // 2
+    
+    # Get similarity metrics
+    metrics = analyzer.similarity_metrics
+    
+    # Create columns for the metrics
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("High Similarity Pairs", metrics.high_similarity_pairs)
-    with col2:
-        avg_similarity = metrics.average_similarity if metrics.average_similarity is not None else 0
-        st.metric("Average Similarity", f"{avg_similarity:.1%}")
+        st.metric(
+            "High Similarity Pairs",
+            f"{metrics.high_similarity_pairs:,}",
+            f"{metrics.high_similarity_pairs/total_possible_pairs:.1%} of possible pairs"
+        )
     
-    # Display similarity distribution if available
+    with col2:
+        st.metric(
+            "Cross-Department Pairs",
+            f"{metrics.cross_department_pairs:,}",
+            f"{metrics.cross_department_pairs/metrics.high_similarity_pairs:.1%} of high similarity pairs"
+        )
+    
+    with col3:
+        st.metric(
+            "Average Similarity",
+            f"{metrics.average_similarity:.2f}",
+            f"Based on {metrics.total_pairs:,} comparisons"
+        )
+    
+    # Display similarity distribution
+    st.subheader("Similarity Distribution")
     if hasattr(metrics, 'similarity_distribution') and metrics.similarity_distribution:
-        st.subheader("Similarity Distribution")
         dist_data = pd.DataFrame({
             'Level': list(metrics.similarity_distribution.keys()),
             'Count': list(metrics.similarity_distribution.values())
@@ -225,6 +246,53 @@ def render_similarity_analysis(results: AnalysisResults):
         
         if dupes_data:
             st.dataframe(pd.DataFrame(dupes_data))
+            
+            # Add download button for duplicate pairs
+            csv = convert_df_to_csv(pd.DataFrame(dupes_data))
+            st.download_button(
+                label="Download Duplicate Pairs",
+                data=csv,
+                file_name="duplicate_pairs.csv",
+                mime="text/csv"
+            )
+    
+    # Display semantic similarity analysis if available
+    if hasattr(analyzer, 'semantic_analyzer') and analyzer.semantic_analyzer is not None:
+        st.subheader("Semantic Similarity Analysis")
+        
+        # Get semantic similarity metrics
+        semantic_metrics = analyzer.semantic_analyzer.get_metrics()
+        
+        if semantic_metrics:
+            st.metric(
+                "Average Semantic Similarity",
+                f"{semantic_metrics.get('average_similarity', 0):.2f}"
+            )
+            
+            # Display semantic similarity distribution
+            if 'similarity_distribution' in semantic_metrics:
+                dist_data = pd.DataFrame({
+                    'Level': list(semantic_metrics['similarity_distribution'].keys()),
+                    'Count': list(semantic_metrics['similarity_distribution'].values())
+                })
+                fig = px.bar(
+                    dist_data,
+                    x='Level',
+                    y='Count',
+                    title="Semantic Similarity Distribution",
+                    color='Level'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Display top semantic matches
+            if 'top_matches' in semantic_metrics:
+                st.subheader("Top Semantic Matches")
+                matches_df = pd.DataFrame(semantic_metrics['top_matches'])
+                st.dataframe(matches_df)
+
+def convert_df_to_csv(df):
+    """Convert DataFrame to CSV string."""
+    return df.to_csv(index=False).encode('utf-8')
 
 def render_recommendations(results: AnalysisResults):
     """Render the recommendations section."""

@@ -1,0 +1,913 @@
+2025-03-30 14:25:21,114 - src.main - INFO - Application initialized successfully
+2025-03-30 14:26:59,994 - src.main - INFO - Application initialized successfully
+2025-03-30 14:27:07,963 - src.main - INFO - Application initialized successfully
+2025-03-30 14:27:07,965 - src.main - INFO - Files uploaded successfully: ['active course dump_010825.xlsx', '2024 courses and their corresponding admin info.xlsx', 'course_redundancies.xlsx', 'ExcelFile_2025-02-04T13_00_11.xlsx', 'courses_in_scope_for_Jona_v2.xlsx', '2024 classes and their corresponding admin info.xlsx', 'count of learner 2024 completions of active courseware.xlsx', 'active course SMdump_010825.xlsx', 'Duration mins by region-entity and mgr status for all comps.xlsx', 'Draft Learning Insights ReportELB.xlsx', '710 active courses with -manag- or -superv- in title.xlsx', 'no of learners logging duration mins for completions in 2024.xlsx', 'Duration mins by region-entity and mgr status for 2024 comps.xlsx']
+2025-03-30 14:27:08,626 - src.services.data_processor - INFO - Processing file: active course dump_010825.xlsx
+2025-03-30 14:27:08,626 - src.services.data_processor - INFO - Shape: (9947, 11)
+2025-03-30 14:27:08,626 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:27:09,856 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 721
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 986
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1338
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1498
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1604
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1739
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2339
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2360
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2779
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2796
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2852
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2969
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2979
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3208
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3312
+2025-03-30 14:27:10,288 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3351
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3681
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 4773
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5964
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5979
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5981
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5982
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6143
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6352
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6361
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6386
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6860
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7656
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7910
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 8396
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9177
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9189
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9667
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9775
+2025-03-30 14:27:10,289 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9789
+2025-03-30 14:27:10,298 - src.services.data_processor - INFO - Null value counts:
+course_description            35
+course_abstract             6995
+course_version              6387
+course_created_by            979
+course_discontinued_from    6668
+course_keywords             5564
+dtype: int64
+2025-03-30 14:27:10,298 - src.services.data_processor - INFO - Successfully processed file: active course dump_010825.xlsx
+2025-03-30 14:27:10,410 - src.services.data_processor - INFO - Processing file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:27:10,410 - src.services.data_processor - INFO - Shape: (213, 7)
+2025-03-30 14:27:10,410 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'data_source']
+2025-03-30 14:27:10,417 - src.services.data_processor - WARNING - No course_no column found in 2024 courses and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:27:10,421 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:10,427 - src.services.data_processor - WARNING - Validation warning in 2024 courses and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:10,428 - src.services.data_processor - INFO - Null value counts:
+inferred_course      1
+data_column_1       22
+data_column_2      204
+data_column_3      159
+data_column_4      212
+data_column_5        2
+dtype: int64
+2025-03-30 14:27:10,428 - src.services.data_processor - INFO - Successfully processed file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:27:10,743 - src.services.data_processor - INFO - Processing file: course_redundancies.xlsx
+2025-03-30 14:27:10,743 - src.services.data_processor - INFO - Shape: (19574, 4)
+2025-03-30 14:27:10,743 - src.services.data_processor - INFO - Columns: ['Course', 'Similar To', 'Similarity Score', 'data_source']
+2025-03-30 14:27:10,743 - src.services.data_processor - WARNING - No course_no column found in course_redundancies.xlsx, creating synthetic course numbers
+2025-03-30 14:27:10,773 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:11,262 - src.services.data_processor - WARNING - Validation warning in course_redundancies.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:11,270 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:27:11,270 - src.services.data_processor - INFO - Successfully processed file: course_redundancies.xlsx
+2025-03-30 14:27:11,524 - src.services.data_processor - INFO - Processing file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:27:11,524 - src.services.data_processor - INFO - Shape: (6115, 6)
+2025-03-30 14:27:11,524 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'DUR MINS', 'AVG HRS spent per completion', 'data_source']
+2025-03-30 14:27:11,571 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:11,732 - src.services.data_processor - WARNING - Validation warning in ExcelFile_2025-02-04T13_00_11.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:11,734 - src.services.data_processor - INFO - Null value counts:
+dur_mins                        15
+avg_hrs_spent_per_completion     4
+dtype: int64
+2025-03-30 14:27:11,734 - src.services.data_processor - INFO - Successfully processed file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:27:12,200 - src.services.data_processor - INFO - Processing file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:27:12,200 - src.services.data_processor - INFO - Shape: (8311, 11)
+2025-03-30 14:27:12,200 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Categories', 'Course Available From', 'Course Discontinued From', 'Sponsoring Dept.', 'Course Intended Audience Type Names', 'data_source']
+2025-03-30 14:27:13,217 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity
+2025-03-30 14:27:13,521 - src.services.data_processor - WARNING - Validation warning in courses_in_scope_for_Jona_v2.xlsx: Missing columns: category_name, course_type, region_entity
+2025-03-30 14:27:13,528 - src.services.data_processor - INFO - Null value counts:
+course_abstract                        6290
+course_version                         6285
+course_categories                      4558
+course_discontinued_from               4985
+course_intended_audience_type_names    4829
+dtype: int64
+2025-03-30 14:27:13,528 - src.services.data_processor - INFO - Successfully processed file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:27:13,801 - src.services.data_processor - INFO - Processing file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:27:13,801 - src.services.data_processor - INFO - Shape: (291, 8)
+2025-03-30 14:27:13,802 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'data_source']
+2025-03-30 14:27:13,805 - src.services.data_processor - WARNING - No course_no column found in 2024 classes and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:27:13,810 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:13,818 - src.services.data_processor - WARNING - Validation warning in 2024 classes and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:13,819 - src.services.data_processor - INFO - Null value counts:
+data_column_0        1
+inferred_course    272
+data_column_2      239
+data_column_3       71
+data_column_4      285
+data_column_5       85
+data_column_6        2
+dtype: int64
+2025-03-30 14:27:13,819 - src.services.data_processor - INFO - Successfully processed file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:27:14,051 - src.services.data_processor - INFO - Processing file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:27:14,052 - src.services.data_processor - INFO - Shape: (8387, 4)
+2025-03-30 14:27:14,052 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'data_source']
+2025-03-30 14:27:14,113 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,336 - src.services.data_processor - WARNING - Validation warning in count of learner 2024 completions of active courseware.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,339 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:27:14,339 - src.services.data_processor - INFO - Successfully processed file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:27:14,353 - src.services.data_processor - INFO - Processing file: active course SMdump_010825.xlsx
+2025-03-30 14:27:14,353 - src.services.data_processor - INFO - Shape: (94, 11)
+2025-03-30 14:27:14,353 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:27:14,371 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:27:14,375 - src.services.data_processor - WARNING - Validation warning in active course SMdump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:27:14,376 - src.services.data_processor - INFO - Null value counts:
+course_abstract             84
+course_version              83
+course_created_by            1
+course_discontinued_from    91
+course_keywords             73
+dtype: int64
+2025-03-30 14:27:14,376 - src.services.data_processor - INFO - Successfully processed file: active course SMdump_010825.xlsx
+2025-03-30 14:27:14,380 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:27:14,380 - src.services.data_processor - INFO - Shape: (69, 4)
+2025-03-30 14:27:14,380 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:27:14,381 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for all comps.xlsx, creating synthetic course numbers
+2025-03-30 14:27:14,383 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:27:14,386 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for all comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:27:14,386 - src.services.data_processor - INFO - Null value counts:
+has_direct_reports    1
+duration_mins         1
+dtype: int64
+2025-03-30 14:27:14,386 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:27:14,394 - src.services.data_processor - INFO - Processing file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:27:14,394 - src.services.data_processor - INFO - Shape: (34, 9)
+2025-03-30 14:27:14,394 - src.services.data_processor - INFO - Columns: ['KP Learn Learning Insights Report', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'Unnamed: 7', 'data_source']
+2025-03-30 14:27:14,400 - src.services.data_processor - WARNING - No course_no column found in Draft Learning Insights ReportELB.xlsx, creating synthetic course numbers
+2025-03-30 14:27:14,404 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,405 - src.services.data_processor - WARNING - Validation warning in Draft Learning Insights ReportELB.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,405 - src.services.data_processor - INFO - Null value counts:
+kp_learn_learning_insights_report     6
+data_column_1                        32
+data_column_2                        10
+data_column_3                        22
+data_column_4                        21
+data_column_5                        25
+dtype: int64
+2025-03-30 14:27:14,405 - src.services.data_processor - INFO - Successfully processed file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:27:14,445 - src.services.data_processor - INFO - Processing file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:27:14,446 - src.services.data_processor - INFO - Shape: (710, 8)
+2025-03-30 14:27:14,446 - src.services.data_processor - INFO - Columns: ['TITLE', 'DESCRIPTION', 'ABSTRACT', 'OFFERING_TEMPLATE_NO', 'AVAIL_FROM', 'DISC_FROM', 'VERSION', 'data_source']
+2025-03-30 14:27:14,458 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,482 - src.services.data_processor - WARNING - Validation warning in 710 active courses with -manag- or -superv- in title.xlsx: Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:27:14,484 - src.services.data_processor - INFO - Null value counts:
+disc_from         283
+course_version    415
+dtype: int64
+2025-03-30 14:27:14,484 - src.services.data_processor - INFO - Successfully processed file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:27:14,489 - src.services.data_processor - INFO - Processing file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:27:14,489 - src.services.data_processor - INFO - Shape: (46, 5)
+2025-03-30 14:27:14,489 - src.services.data_processor - INFO - Columns: ['TYPE', 'PERSON_TYPE', 'REGION_ENTITY', 'NO_OF_LEARNERS', 'data_source']
+2025-03-30 14:27:14,489 - src.services.data_processor - WARNING - No course_no column found in no of learners logging duration mins for completions in 2024.xlsx, creating synthetic course numbers
+2025-03-30 14:27:14,492 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:27:14,493 - src.services.data_processor - WARNING - Validation warning in no of learners logging duration mins for completions in 2024.xlsx: Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:27:14,494 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:27:14,494 - src.services.data_processor - INFO - Successfully processed file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:27:14,498 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:27:14,498 - src.services.data_processor - INFO - Shape: (61, 4)
+2025-03-30 14:27:14,498 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:27:14,498 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for 2024 comps.xlsx, creating synthetic course numbers
+2025-03-30 14:27:14,503 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:27:14,505 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for 2024 comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:27:14,505 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:27:14,505 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:27:14,525 - src.services.data_processor - INFO - Successfully combined 13 dataframes
+2025-03-30 14:27:14,526 - src.services.data_processor - INFO - Combined shape: (53852, 39)
+2025-03-30 14:27:14,564 - src.services.data_processor - WARNING - Removed 20663 duplicate courses
+2025-03-30 14:27:14,806 - src.services.data_processor - INFO - Successfully transformed combined dataframe
+2025-03-30 14:27:14,806 - src.services.data_processor - INFO - Final shape: (33189, 42)
+2025-03-30 14:27:14,806 - src.services.data_processor - INFO - Final columns: ['course_title', 'course_no', 'course_description', 'course_abstract', 'course_version', 'course_created_by', 'course_available_from', 'course_discontinued_from', 'course_keywords', 'category_name', 'data_source', 'standardized_course_no', 'numeric_course_id', 'inferred_course', 'data_column_1', 'data_column_2', 'data_column_3', 'data_column_4', 'data_column_5', 'course', 'similar_to', 'similarity_score', 'total_2024_activity', 'dur_mins', 'avg_hrs_spent_per_completion', 'course_categories', 'sponsoring_dept.', 'course_intended_audience_type_names', 'data_column_0', 'data_column_6', 'has_direct_reports', 'region_entity', 'duration_mins', 'kp_learn_learning_insights_report', 'avail_from', 'disc_from', 'course_type', 'person_type', 'no_of_learners', 'course_age_days', 'course_status', 'activity_level']
+2025-03-30 14:27:14,807 - src.services.data_processor - INFO - Data types:
+course_title                                   object
+course_no                                      object
+course_description                             object
+course_abstract                                object
+course_version                                 object
+course_created_by                              object
+course_available_from                  datetime64[ns]
+course_discontinued_from               datetime64[ns]
+course_keywords                                object
+category_name                                  object
+data_source                                    object
+standardized_course_no                         object
+numeric_course_id                              object
+inferred_course                                object
+data_column_1                                  object
+data_column_2                                  object
+data_column_3                                  object
+data_column_4                                  object
+data_column_5                                  object
+course                                         object
+similar_to                                     object
+similarity_score                              float64
+total_2024_activity                             Int64
+dur_mins                                      float64
+avg_hrs_spent_per_completion                  float64
+course_categories                              object
+sponsoring_dept.                               object
+course_intended_audience_type_names            object
+data_column_0                                  object
+data_column_6                                  object
+has_direct_reports                             object
+region_entity                                  object
+duration_mins                                 float64
+kp_learn_learning_insights_report              object
+avail_from                                     object
+disc_from                                      object
+course_type                                    object
+person_type                                    object
+no_of_learners                                float64
+course_age_days                               float64
+course_status                                  object
+activity_level                               category
+dtype: object
+2025-03-30 14:42:56,522 - src.main - INFO - Application initialized successfully
+2025-03-30 14:43:48,092 - src.main - INFO - Application initialized successfully
+2025-03-30 14:43:53,933 - src.main - INFO - Application initialized successfully
+2025-03-30 14:43:53,937 - src.main - INFO - Files uploaded successfully: ['2024 courses and their corresponding admin info.xlsx', 'course_redundancies.xlsx', 'ExcelFile_2025-02-04T13_00_11.xlsx', 'active course dump_010825.xlsx', 'courses_in_scope_for_Jona_v2.xlsx', '2024 classes and their corresponding admin info.xlsx', 'count of learner 2024 completions of active courseware.xlsx', 'active course SMdump_010825.xlsx', 'Duration mins by region-entity and mgr status for all comps.xlsx', 'Draft Learning Insights ReportELB.xlsx', '710 active courses with -manag- or -superv- in title.xlsx', 'no of learners logging duration mins for completions in 2024.xlsx', 'Duration mins by region-entity and mgr status for 2024 comps.xlsx']
+2025-03-30 14:43:54,153 - src.services.data_processor - INFO - Processing file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:43:54,153 - src.services.data_processor - INFO - Shape: (213, 7)
+2025-03-30 14:43:54,153 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'data_source']
+2025-03-30 14:43:54,157 - src.services.data_processor - WARNING - No course_no column found in 2024 courses and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:43:54,163 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:54,171 - src.services.data_processor - WARNING - Validation warning in 2024 courses and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:54,171 - src.services.data_processor - INFO - Null value counts:
+inferred_course      1
+data_column_1       22
+data_column_2      204
+data_column_3      159
+data_column_4      212
+data_column_5        2
+dtype: int64
+2025-03-30 14:43:54,171 - src.services.data_processor - INFO - Successfully processed file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:43:54,516 - src.services.data_processor - INFO - Processing file: course_redundancies.xlsx
+2025-03-30 14:43:54,516 - src.services.data_processor - INFO - Shape: (19574, 4)
+2025-03-30 14:43:54,516 - src.services.data_processor - INFO - Columns: ['Course', 'Similar To', 'Similarity Score', 'data_source']
+2025-03-30 14:43:54,517 - src.services.data_processor - WARNING - No course_no column found in course_redundancies.xlsx, creating synthetic course numbers
+2025-03-30 14:43:54,547 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:55,041 - src.services.data_processor - WARNING - Validation warning in course_redundancies.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:55,049 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:43:55,049 - src.services.data_processor - INFO - Successfully processed file: course_redundancies.xlsx
+2025-03-30 14:43:55,255 - src.services.data_processor - INFO - Processing file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:43:55,255 - src.services.data_processor - INFO - Shape: (6115, 6)
+2025-03-30 14:43:55,255 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'DUR MINS', 'AVG HRS spent per completion', 'data_source']
+2025-03-30 14:43:55,302 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:55,463 - src.services.data_processor - WARNING - Validation warning in ExcelFile_2025-02-04T13_00_11.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:55,465 - src.services.data_processor - INFO - Null value counts:
+dur_mins                        15
+avg_hrs_spent_per_completion     4
+dtype: int64
+2025-03-30 14:43:55,465 - src.services.data_processor - INFO - Successfully processed file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:43:55,973 - src.services.data_processor - INFO - Processing file: active course dump_010825.xlsx
+2025-03-30 14:43:55,973 - src.services.data_processor - INFO - Shape: (9947, 11)
+2025-03-30 14:43:55,973 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:43:57,199 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 721
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 986
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1338
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1498
+2025-03-30 14:43:57,630 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1604
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1739
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2339
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2360
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2779
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2796
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2852
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2969
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2979
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3208
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3312
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3351
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3681
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 4773
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5964
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5979
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5981
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5982
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6143
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6352
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6361
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6386
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6860
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7656
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7910
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 8396
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9177
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9189
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9667
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9775
+2025-03-30 14:43:57,631 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9789
+2025-03-30 14:43:57,640 - src.services.data_processor - INFO - Null value counts:
+course_description            35
+course_abstract             6995
+course_version              6387
+course_created_by            979
+course_discontinued_from    6668
+course_keywords             5564
+dtype: int64
+2025-03-30 14:43:57,640 - src.services.data_processor - INFO - Successfully processed file: active course dump_010825.xlsx
+2025-03-30 14:43:58,143 - src.services.data_processor - INFO - Processing file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:43:58,143 - src.services.data_processor - INFO - Shape: (8311, 11)
+2025-03-30 14:43:58,143 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Categories', 'Course Available From', 'Course Discontinued From', 'Sponsoring Dept.', 'Course Intended Audience Type Names', 'data_source']
+2025-03-30 14:43:59,127 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity
+2025-03-30 14:43:59,440 - src.services.data_processor - WARNING - Validation warning in courses_in_scope_for_Jona_v2.xlsx: Missing columns: category_name, course_type, region_entity
+2025-03-30 14:43:59,448 - src.services.data_processor - INFO - Null value counts:
+course_abstract                        6290
+course_version                         6285
+course_categories                      4558
+course_discontinued_from               4985
+course_intended_audience_type_names    4829
+dtype: int64
+2025-03-30 14:43:59,448 - src.services.data_processor - INFO - Successfully processed file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:43:59,721 - src.services.data_processor - INFO - Processing file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:43:59,721 - src.services.data_processor - INFO - Shape: (291, 8)
+2025-03-30 14:43:59,721 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'data_source']
+2025-03-30 14:43:59,725 - src.services.data_processor - WARNING - No course_no column found in 2024 classes and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:43:59,730 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:59,737 - src.services.data_processor - WARNING - Validation warning in 2024 classes and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:43:59,738 - src.services.data_processor - INFO - Null value counts:
+data_column_0        1
+inferred_course    272
+data_column_2      239
+data_column_3       71
+data_column_4      285
+data_column_5       85
+data_column_6        2
+dtype: int64
+2025-03-30 14:43:59,738 - src.services.data_processor - INFO - Successfully processed file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:43:59,929 - src.services.data_processor - INFO - Processing file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:43:59,929 - src.services.data_processor - INFO - Shape: (8387, 4)
+2025-03-30 14:43:59,929 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'data_source']
+2025-03-30 14:43:59,992 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,217 - src.services.data_processor - WARNING - Validation warning in count of learner 2024 completions of active courseware.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,222 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:44:00,222 - src.services.data_processor - INFO - Successfully processed file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:44:00,288 - src.services.data_processor - INFO - Processing file: active course SMdump_010825.xlsx
+2025-03-30 14:44:00,288 - src.services.data_processor - INFO - Shape: (94, 11)
+2025-03-30 14:44:00,288 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:44:00,309 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:44:00,313 - src.services.data_processor - WARNING - Validation warning in active course SMdump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:44:00,313 - src.services.data_processor - INFO - Null value counts:
+course_abstract             84
+course_version              83
+course_created_by            1
+course_discontinued_from    91
+course_keywords             73
+dtype: int64
+2025-03-30 14:44:00,313 - src.services.data_processor - INFO - Successfully processed file: active course SMdump_010825.xlsx
+2025-03-30 14:44:00,317 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:44:00,317 - src.services.data_processor - INFO - Shape: (69, 4)
+2025-03-30 14:44:00,318 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:44:00,318 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for all comps.xlsx, creating synthetic course numbers
+2025-03-30 14:44:00,320 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:44:00,322 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for all comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:44:00,323 - src.services.data_processor - INFO - Null value counts:
+has_direct_reports    1
+duration_mins         1
+dtype: int64
+2025-03-30 14:44:00,323 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:44:00,331 - src.services.data_processor - INFO - Processing file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:44:00,331 - src.services.data_processor - INFO - Shape: (34, 9)
+2025-03-30 14:44:00,331 - src.services.data_processor - INFO - Columns: ['KP Learn Learning Insights Report', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'Unnamed: 7', 'data_source']
+2025-03-30 14:44:00,335 - src.services.data_processor - WARNING - No course_no column found in Draft Learning Insights ReportELB.xlsx, creating synthetic course numbers
+2025-03-30 14:44:00,339 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,340 - src.services.data_processor - WARNING - Validation warning in Draft Learning Insights ReportELB.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,340 - src.services.data_processor - INFO - Null value counts:
+kp_learn_learning_insights_report     6
+data_column_1                        32
+data_column_2                        10
+data_column_3                        22
+data_column_4                        21
+data_column_5                        25
+dtype: int64
+2025-03-30 14:44:00,340 - src.services.data_processor - INFO - Successfully processed file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:44:00,379 - src.services.data_processor - INFO - Processing file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:44:00,379 - src.services.data_processor - INFO - Shape: (710, 8)
+2025-03-30 14:44:00,379 - src.services.data_processor - INFO - Columns: ['TITLE', 'DESCRIPTION', 'ABSTRACT', 'OFFERING_TEMPLATE_NO', 'AVAIL_FROM', 'DISC_FROM', 'VERSION', 'data_source']
+2025-03-30 14:44:00,390 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,411 - src.services.data_processor - WARNING - Validation warning in 710 active courses with -manag- or -superv- in title.xlsx: Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:44:00,412 - src.services.data_processor - INFO - Null value counts:
+disc_from         283
+course_version    415
+dtype: int64
+2025-03-30 14:44:00,412 - src.services.data_processor - INFO - Successfully processed file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:44:00,416 - src.services.data_processor - INFO - Processing file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:44:00,416 - src.services.data_processor - INFO - Shape: (46, 5)
+2025-03-30 14:44:00,416 - src.services.data_processor - INFO - Columns: ['TYPE', 'PERSON_TYPE', 'REGION_ENTITY', 'NO_OF_LEARNERS', 'data_source']
+2025-03-30 14:44:00,417 - src.services.data_processor - WARNING - No course_no column found in no of learners logging duration mins for completions in 2024.xlsx, creating synthetic course numbers
+2025-03-30 14:44:00,419 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:44:00,420 - src.services.data_processor - WARNING - Validation warning in no of learners logging duration mins for completions in 2024.xlsx: Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:44:00,421 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:44:00,421 - src.services.data_processor - INFO - Successfully processed file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:44:00,425 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:44:00,425 - src.services.data_processor - INFO - Shape: (61, 4)
+2025-03-30 14:44:00,425 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:44:00,425 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for 2024 comps.xlsx, creating synthetic course numbers
+2025-03-30 14:44:00,428 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:44:00,430 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for 2024 comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:44:00,430 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:44:00,430 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:44:00,449 - src.services.data_processor - INFO - Successfully combined 13 dataframes
+2025-03-30 14:44:00,449 - src.services.data_processor - INFO - Combined shape: (53852, 39)
+2025-03-30 14:44:00,484 - src.services.data_processor - WARNING - Removed 20663 duplicate courses
+2025-03-30 14:44:00,729 - src.services.data_processor - INFO - Successfully transformed combined dataframe
+2025-03-30 14:44:00,729 - src.services.data_processor - INFO - Final shape: (33189, 42)
+2025-03-30 14:44:00,729 - src.services.data_processor - INFO - Final columns: ['inferred_course', 'data_column_1', 'data_column_2', 'data_column_3', 'data_column_4', 'data_column_5', 'data_source', 'course_no', 'standardized_course_no', 'numeric_course_id', 'course', 'similar_to', 'similarity_score', 'course_title', 'total_2024_activity', 'dur_mins', 'avg_hrs_spent_per_completion', 'course_description', 'course_abstract', 'course_version', 'course_created_by', 'course_available_from', 'course_discontinued_from', 'course_keywords', 'category_name', 'course_categories', 'sponsoring_dept.', 'course_intended_audience_type_names', 'data_column_0', 'data_column_6', 'has_direct_reports', 'region_entity', 'duration_mins', 'kp_learn_learning_insights_report', 'avail_from', 'disc_from', 'course_type', 'person_type', 'no_of_learners', 'course_age_days', 'course_status', 'activity_level']
+2025-03-30 14:44:00,729 - src.services.data_processor - INFO - Data types:
+inferred_course                                object
+data_column_1                                  object
+data_column_2                                  object
+data_column_3                                  object
+data_column_4                                  object
+data_column_5                                  object
+data_source                                    object
+course_no                                      object
+standardized_course_no                         object
+numeric_course_id                              object
+course                                         object
+similar_to                                     object
+similarity_score                              float64
+course_title                                   object
+total_2024_activity                             Int64
+dur_mins                                      float64
+avg_hrs_spent_per_completion                  float64
+course_description                             object
+course_abstract                                object
+course_version                                 object
+course_created_by                              object
+course_available_from                  datetime64[ns]
+course_discontinued_from               datetime64[ns]
+course_keywords                                object
+category_name                                  object
+course_categories                              object
+sponsoring_dept.                               object
+course_intended_audience_type_names            object
+data_column_0                                  object
+data_column_6                                  object
+has_direct_reports                             object
+region_entity                                  object
+duration_mins                                 float64
+kp_learn_learning_insights_report              object
+avail_from                                     object
+disc_from                                      object
+course_type                                    object
+person_type                                    object
+no_of_learners                                float64
+course_age_days                               float64
+course_status                                  object
+activity_level                               category
+dtype: object
+2025-03-30 14:46:11,830 - src.main - INFO - Application initialized successfully
+2025-03-30 14:46:17,732 - src.main - INFO - Application initialized successfully
+2025-03-30 14:46:17,735 - src.main - INFO - Files uploaded successfully: ['2024 courses and their corresponding admin info.xlsx', 'courses_in_scope_for_Jona_v2.xlsx', 'course_redundancies.xlsx', 'ExcelFile_2025-02-04T13_00_11.xlsx', 'active course dump_010825.xlsx', '2024 classes and their corresponding admin info.xlsx', 'count of learner 2024 completions of active courseware.xlsx', 'active course SMdump_010825.xlsx', 'Duration mins by region-entity and mgr status for all comps.xlsx', 'Draft Learning Insights ReportELB.xlsx', '710 active courses with -manag- or -superv- in title.xlsx', 'no of learners logging duration mins for completions in 2024.xlsx', 'Duration mins by region-entity and mgr status for 2024 comps.xlsx']
+2025-03-30 14:46:17,940 - src.services.data_processor - INFO - Processing file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:46:17,940 - src.services.data_processor - INFO - Shape: (213, 7)
+2025-03-30 14:46:17,940 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'data_source']
+2025-03-30 14:46:17,944 - src.services.data_processor - WARNING - No course_no column found in 2024 courses and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:46:17,948 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:17,956 - src.services.data_processor - WARNING - Validation warning in 2024 courses and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:17,956 - src.services.data_processor - INFO - Null value counts:
+inferred_course      1
+data_column_1       22
+data_column_2      204
+data_column_3      159
+data_column_4      212
+data_column_5        2
+dtype: int64
+2025-03-30 14:46:17,956 - src.services.data_processor - INFO - Successfully processed file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 14:46:18,463 - src.services.data_processor - INFO - Processing file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:46:18,463 - src.services.data_processor - INFO - Shape: (8311, 11)
+2025-03-30 14:46:18,463 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Categories', 'Course Available From', 'Course Discontinued From', 'Sponsoring Dept.', 'Course Intended Audience Type Names', 'data_source']
+2025-03-30 14:46:19,444 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity
+2025-03-30 14:46:19,750 - src.services.data_processor - WARNING - Validation warning in courses_in_scope_for_Jona_v2.xlsx: Missing columns: category_name, course_type, region_entity
+2025-03-30 14:46:19,757 - src.services.data_processor - INFO - Null value counts:
+course_abstract                        6290
+course_version                         6285
+course_categories                      4558
+course_discontinued_from               4985
+course_intended_audience_type_names    4829
+dtype: int64
+2025-03-30 14:46:19,758 - src.services.data_processor - INFO - Successfully processed file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 14:46:20,089 - src.services.data_processor - INFO - Processing file: course_redundancies.xlsx
+2025-03-30 14:46:20,089 - src.services.data_processor - INFO - Shape: (19574, 4)
+2025-03-30 14:46:20,089 - src.services.data_processor - INFO - Columns: ['Course', 'Similar To', 'Similarity Score', 'data_source']
+2025-03-30 14:46:20,090 - src.services.data_processor - WARNING - No course_no column found in course_redundancies.xlsx, creating synthetic course numbers
+2025-03-30 14:46:20,120 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:20,624 - src.services.data_processor - WARNING - Validation warning in course_redundancies.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:20,632 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:46:20,632 - src.services.data_processor - INFO - Successfully processed file: course_redundancies.xlsx
+2025-03-30 14:46:20,847 - src.services.data_processor - INFO - Processing file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:46:20,847 - src.services.data_processor - INFO - Shape: (6115, 6)
+2025-03-30 14:46:20,847 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'DUR MINS', 'AVG HRS spent per completion', 'data_source']
+2025-03-30 14:46:20,894 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:21,071 - src.services.data_processor - WARNING - Validation warning in ExcelFile_2025-02-04T13_00_11.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:21,074 - src.services.data_processor - INFO - Null value counts:
+dur_mins                        15
+avg_hrs_spent_per_completion     4
+dtype: int64
+2025-03-30 14:46:21,074 - src.services.data_processor - INFO - Successfully processed file: ExcelFile_2025-02-04T13_00_11.xlsx
+2025-03-30 14:46:21,585 - src.services.data_processor - INFO - Processing file: active course dump_010825.xlsx
+2025-03-30 14:46:21,585 - src.services.data_processor - INFO - Shape: (9947, 11)
+2025-03-30 14:46:21,585 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:46:22,789 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 721
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 986
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1338
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1498
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1604
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1739
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2339
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2360
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2779
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2796
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2852
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2969
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2979
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3208
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3312
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3351
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3681
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 4773
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5964
+2025-03-30 14:46:23,216 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5979
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5981
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5982
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6143
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6352
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6361
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6386
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6860
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7656
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7910
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 8396
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9177
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9189
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9667
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9775
+2025-03-30 14:46:23,217 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9789
+2025-03-30 14:46:23,226 - src.services.data_processor - INFO - Null value counts:
+course_description            35
+course_abstract             6995
+course_version              6387
+course_created_by            979
+course_discontinued_from    6668
+course_keywords             5564
+dtype: int64
+2025-03-30 14:46:23,227 - src.services.data_processor - INFO - Successfully processed file: active course dump_010825.xlsx
+2025-03-30 14:46:23,499 - src.services.data_processor - INFO - Processing file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:46:23,499 - src.services.data_processor - INFO - Shape: (291, 8)
+2025-03-30 14:46:23,499 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'data_source']
+2025-03-30 14:46:23,503 - src.services.data_processor - WARNING - No course_no column found in 2024 classes and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 14:46:23,507 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:23,515 - src.services.data_processor - WARNING - Validation warning in 2024 classes and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:23,516 - src.services.data_processor - INFO - Null value counts:
+data_column_0        1
+inferred_course    272
+data_column_2      239
+data_column_3       71
+data_column_4      285
+data_column_5       85
+data_column_6        2
+dtype: int64
+2025-03-30 14:46:23,516 - src.services.data_processor - INFO - Successfully processed file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 14:46:23,749 - src.services.data_processor - INFO - Processing file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:46:23,749 - src.services.data_processor - INFO - Shape: (8387, 4)
+2025-03-30 14:46:23,749 - src.services.data_processor - INFO - Columns: ['COURSE_ID', 'COURSE_TITLE', 'TOTAL_2024_ACTIVITY', 'data_source']
+2025-03-30 14:46:23,812 - src.services.data_validator - WARNING - Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,043 - src.services.data_processor - WARNING - Validation warning in count of learner 2024 completions of active courseware.xlsx: Missing columns: category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,047 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:46:24,047 - src.services.data_processor - INFO - Successfully processed file: count of learner 2024 completions of active courseware.xlsx
+2025-03-30 14:46:24,061 - src.services.data_processor - INFO - Processing file: active course SMdump_010825.xlsx
+2025-03-30 14:46:24,061 - src.services.data_processor - INFO - Shape: (94, 11)
+2025-03-30 14:46:24,061 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 14:46:24,080 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 14:46:24,084 - src.services.data_processor - WARNING - Validation warning in active course SMdump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 14:46:24,085 - src.services.data_processor - INFO - Null value counts:
+course_abstract             84
+course_version              83
+course_created_by            1
+course_discontinued_from    91
+course_keywords             73
+dtype: int64
+2025-03-30 14:46:24,085 - src.services.data_processor - INFO - Successfully processed file: active course SMdump_010825.xlsx
+2025-03-30 14:46:24,089 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:46:24,089 - src.services.data_processor - INFO - Shape: (69, 4)
+2025-03-30 14:46:24,089 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:46:24,090 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for all comps.xlsx, creating synthetic course numbers
+2025-03-30 14:46:24,092 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:46:24,094 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for all comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:46:24,095 - src.services.data_processor - INFO - Null value counts:
+has_direct_reports    1
+duration_mins         1
+dtype: int64
+2025-03-30 14:46:24,095 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for all comps.xlsx
+2025-03-30 14:46:24,104 - src.services.data_processor - INFO - Processing file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:46:24,104 - src.services.data_processor - INFO - Shape: (34, 9)
+2025-03-30 14:46:24,104 - src.services.data_processor - INFO - Columns: ['KP Learn Learning Insights Report', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'Unnamed: 7', 'data_source']
+2025-03-30 14:46:24,108 - src.services.data_processor - WARNING - No course_no column found in Draft Learning Insights ReportELB.xlsx, creating synthetic course numbers
+2025-03-30 14:46:24,112 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,113 - src.services.data_processor - WARNING - Validation warning in Draft Learning Insights ReportELB.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,114 - src.services.data_processor - INFO - Null value counts:
+kp_learn_learning_insights_report     6
+data_column_1                        32
+data_column_2                        10
+data_column_3                        22
+data_column_4                        21
+data_column_5                        25
+dtype: int64
+2025-03-30 14:46:24,114 - src.services.data_processor - INFO - Successfully processed file: Draft Learning Insights ReportELB.xlsx
+2025-03-30 14:46:24,155 - src.services.data_processor - INFO - Processing file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:46:24,155 - src.services.data_processor - INFO - Shape: (710, 8)
+2025-03-30 14:46:24,155 - src.services.data_processor - INFO - Columns: ['TITLE', 'DESCRIPTION', 'ABSTRACT', 'OFFERING_TEMPLATE_NO', 'AVAIL_FROM', 'DISC_FROM', 'VERSION', 'data_source']
+2025-03-30 14:46:24,167 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,189 - src.services.data_processor - WARNING - Validation warning in 710 active courses with -manag- or -superv- in title.xlsx: Missing columns: category_name, course_type, region_entity, course_available_from
+2025-03-30 14:46:24,190 - src.services.data_processor - INFO - Null value counts:
+disc_from         283
+course_version    415
+dtype: int64
+2025-03-30 14:46:24,190 - src.services.data_processor - INFO - Successfully processed file: 710 active courses with -manag- or -superv- in title.xlsx
+2025-03-30 14:46:24,194 - src.services.data_processor - INFO - Processing file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:46:24,194 - src.services.data_processor - INFO - Shape: (46, 5)
+2025-03-30 14:46:24,194 - src.services.data_processor - INFO - Columns: ['TYPE', 'PERSON_TYPE', 'REGION_ENTITY', 'NO_OF_LEARNERS', 'data_source']
+2025-03-30 14:46:24,194 - src.services.data_processor - WARNING - No course_no column found in no of learners logging duration mins for completions in 2024.xlsx, creating synthetic course numbers
+2025-03-30 14:46:24,197 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:46:24,198 - src.services.data_processor - WARNING - Validation warning in no of learners logging duration mins for completions in 2024.xlsx: Missing columns: course_title, category_name, course_description, course_available_from
+2025-03-30 14:46:24,199 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:46:24,199 - src.services.data_processor - INFO - Successfully processed file: no of learners logging duration mins for completions in 2024.xlsx
+2025-03-30 14:46:24,203 - src.services.data_processor - INFO - Processing file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:46:24,207 - src.services.data_processor - INFO - Shape: (61, 4)
+2025-03-30 14:46:24,207 - src.services.data_processor - INFO - Columns: ['HAS_DIRECT_REPORTS', 'REGION_ENTITY', 'DURATION_MINS', 'data_source']
+2025-03-30 14:46:24,208 - src.services.data_processor - WARNING - No course_no column found in Duration mins by region-entity and mgr status for 2024 comps.xlsx, creating synthetic course numbers
+2025-03-30 14:46:24,211 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:46:24,212 - src.services.data_processor - WARNING - Validation warning in Duration mins by region-entity and mgr status for 2024 comps.xlsx: Missing columns: course_title, category_name, course_description, course_type, course_available_from
+2025-03-30 14:46:24,213 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 14:46:24,213 - src.services.data_processor - INFO - Successfully processed file: Duration mins by region-entity and mgr status for 2024 comps.xlsx
+2025-03-30 14:46:24,231 - src.services.data_processor - INFO - Successfully combined 13 dataframes
+2025-03-30 14:46:24,231 - src.services.data_processor - INFO - Combined shape: (53852, 39)
+2025-03-30 14:46:24,268 - src.services.data_processor - WARNING - Removed 20663 duplicate courses
+2025-03-30 14:46:24,508 - src.services.data_processor - INFO - Successfully transformed combined dataframe
+2025-03-30 14:46:24,508 - src.services.data_processor - INFO - Final shape: (33189, 42)
+2025-03-30 14:46:24,508 - src.services.data_processor - INFO - Final columns: ['inferred_course', 'data_column_1', 'data_column_2', 'data_column_3', 'data_column_4', 'data_column_5', 'data_source', 'course_no', 'standardized_course_no', 'numeric_course_id', 'course_title', 'course_description', 'course_abstract', 'course_version', 'course_categories', 'course_available_from', 'course_discontinued_from', 'sponsoring_dept.', 'course_intended_audience_type_names', 'course', 'similar_to', 'similarity_score', 'total_2024_activity', 'dur_mins', 'avg_hrs_spent_per_completion', 'course_created_by', 'course_keywords', 'category_name', 'data_column_0', 'data_column_6', 'has_direct_reports', 'region_entity', 'duration_mins', 'kp_learn_learning_insights_report', 'avail_from', 'disc_from', 'course_type', 'person_type', 'no_of_learners', 'course_age_days', 'course_status', 'activity_level']
+2025-03-30 14:46:24,509 - src.services.data_processor - INFO - Data types:
+inferred_course                                object
+data_column_1                                  object
+data_column_2                                  object
+data_column_3                                  object
+data_column_4                                  object
+data_column_5                                  object
+data_source                                    object
+course_no                                      object
+standardized_course_no                         object
+numeric_course_id                              object
+course_title                                   object
+course_description                             object
+course_abstract                                object
+course_version                                 object
+course_categories                              object
+course_available_from                  datetime64[ns]
+course_discontinued_from               datetime64[ns]
+sponsoring_dept.                               object
+course_intended_audience_type_names            object
+course                                         object
+similar_to                                     object
+similarity_score                              float64
+total_2024_activity                             Int64
+dur_mins                                      float64
+avg_hrs_spent_per_completion                  float64
+course_created_by                              object
+course_keywords                                object
+category_name                                  object
+data_column_0                                  object
+data_column_6                                  object
+has_direct_reports                             object
+region_entity                                  object
+duration_mins                                 float64
+kp_learn_learning_insights_report              object
+avail_from                                     object
+disc_from                                      object
+course_type                                    object
+person_type                                    object
+no_of_learners                                float64
+course_age_days                               float64
+course_status                                  object
+activity_level                               category
+dtype: object
+2025-03-30 15:25:32,665 - src.main - INFO - Application initialized successfully
+2025-03-30 15:25:41,340 - src.main - INFO - Application initialized successfully
+2025-03-30 15:25:41,344 - src.main - INFO - Files uploaded successfully: ['course_redundancies.xlsx', 'active course dump_010825.xlsx', 'courses_in_scope_for_Jona_v2.xlsx', '2024 classes and their corresponding admin info.xlsx', '2024 courses and their corresponding admin info.xlsx']
+2025-03-30 15:25:41,804 - src.services.data_processor - INFO - Processing file: course_redundancies.xlsx
+2025-03-30 15:25:41,804 - src.services.data_processor - INFO - Shape: (19574, 4)
+2025-03-30 15:25:41,804 - src.services.data_processor - INFO - Columns: ['Course', 'Similar To', 'Similarity Score', 'data_source']
+2025-03-30 15:25:41,805 - src.services.data_processor - WARNING - No course_no column found in course_redundancies.xlsx, creating synthetic course numbers
+2025-03-30 15:25:41,836 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:42,327 - src.services.data_processor - WARNING - Validation warning in course_redundancies.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:42,335 - src.services.data_processor - INFO - Null value counts:
+Series([], dtype: int64)
+2025-03-30 15:25:42,335 - src.services.data_processor - INFO - Successfully processed file: course_redundancies.xlsx
+2025-03-30 15:25:42,854 - src.services.data_processor - INFO - Processing file: active course dump_010825.xlsx
+2025-03-30 15:25:42,854 - src.services.data_processor - INFO - Shape: (9947, 11)
+2025-03-30 15:25:42,854 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Created By', 'Course Available From', 'Course Discontinued From', 'Course Keywords', 'Category Name', 'data_source']
+2025-03-30 15:25:44,072 - src.services.data_validator - WARNING - Missing columns: course_type, region_entity
+2025-03-30 15:25:44,491 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing columns: course_type, region_entity
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 721
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 986
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1338
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1498
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1604
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 1739
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2339
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2360
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2779
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2796
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2852
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2969
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 2979
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3208
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3312
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3351
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 3681
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 4773
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5964
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5979
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5981
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 5982
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6143
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6352
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6361
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6386
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 6860
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7656
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 7910
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 8396
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9177
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9189
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9667
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9775
+2025-03-30 15:25:44,492 - src.services.data_processor - WARNING - Validation warning in active course dump_010825.xlsx: Missing required value for course_description in row 9789
+2025-03-30 15:25:44,502 - src.services.data_processor - INFO - Null value counts:
+course_description            35
+course_abstract             6995
+course_version              6387
+course_created_by            979
+course_discontinued_from    6668
+course_keywords             5564
+dtype: int64
+2025-03-30 15:25:44,502 - src.services.data_processor - INFO - Successfully processed file: active course dump_010825.xlsx
+2025-03-30 15:25:45,026 - src.services.data_processor - INFO - Processing file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 15:25:45,026 - src.services.data_processor - INFO - Shape: (8311, 11)
+2025-03-30 15:25:45,026 - src.services.data_processor - INFO - Columns: ['Course Title', 'Course No', 'Course Description', 'Course Abstract', 'Course Version', 'Course Categories', 'Course Available From', 'Course Discontinued From', 'Sponsoring Dept.', 'Course Intended Audience Type Names', 'data_source']
+2025-03-30 15:25:46,022 - src.services.data_validator - WARNING - Missing columns: category_name, course_type, region_entity
+2025-03-30 15:25:46,325 - src.services.data_processor - WARNING - Validation warning in courses_in_scope_for_Jona_v2.xlsx: Missing columns: category_name, course_type, region_entity
+2025-03-30 15:25:46,333 - src.services.data_processor - INFO - Null value counts:
+course_abstract                        6290
+course_version                         6285
+course_categories                      4558
+course_discontinued_from               4985
+course_intended_audience_type_names    4829
+dtype: int64
+2025-03-30 15:25:46,333 - src.services.data_processor - INFO - Successfully processed file: courses_in_scope_for_Jona_v2.xlsx
+2025-03-30 15:25:46,572 - src.services.data_processor - INFO - Processing file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 15:25:46,572 - src.services.data_processor - INFO - Shape: (291, 8)
+2025-03-30 15:25:46,573 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'Unnamed: 6', 'data_source']
+2025-03-30 15:25:46,576 - src.services.data_processor - WARNING - No course_no column found in 2024 classes and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 15:25:46,581 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:46,590 - src.services.data_processor - WARNING - Validation warning in 2024 classes and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:46,590 - src.services.data_processor - INFO - Null value counts:
+data_column_0        1
+inferred_course    272
+data_column_2      239
+data_column_3       71
+data_column_4      285
+data_column_5       85
+data_column_6        2
+dtype: int64
+2025-03-30 15:25:46,590 - src.services.data_processor - INFO - Successfully processed file: 2024 classes and their corresponding admin info.xlsx
+2025-03-30 15:25:46,746 - src.services.data_processor - INFO - Processing file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 15:25:46,746 - src.services.data_processor - INFO - Shape: (213, 7)
+2025-03-30 15:25:46,746 - src.services.data_processor - INFO - Columns: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4', 'Unnamed: 5', 'data_source']
+2025-03-30 15:25:46,749 - src.services.data_processor - WARNING - No course_no column found in 2024 courses and their corresponding admin info.xlsx, creating synthetic course numbers
+2025-03-30 15:25:46,754 - src.services.data_validator - WARNING - Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:46,759 - src.services.data_processor - WARNING - Validation warning in 2024 courses and their corresponding admin info.xlsx: Missing columns: course_title, category_name, course_description, course_type, region_entity, course_available_from
+2025-03-30 15:25:46,760 - src.services.data_processor - INFO - Null value counts:
+inferred_course      1
+data_column_1       22
+data_column_2      204
+data_column_3      159
+data_column_4      212
+data_column_5        2
+dtype: int64
+2025-03-30 15:25:46,760 - src.services.data_processor - INFO - Successfully processed file: 2024 courses and their corresponding admin info.xlsx
+2025-03-30 15:25:46,769 - src.services.data_processor - INFO - Successfully combined 5 dataframes
+2025-03-30 15:25:46,769 - src.services.data_processor - INFO - Combined shape: (38336, 27)
+2025-03-30 15:25:46,790 - src.services.data_processor - WARNING - Removed 6095 duplicate courses
+2025-03-30 15:25:46,947 - src.services.data_processor - INFO - Successfully transformed combined dataframe
+2025-03-30 15:25:46,947 - src.services.data_processor - INFO - Final shape: (32241, 29)
+2025-03-30 15:25:46,947 - src.services.data_processor - INFO - Final columns: ['course', 'similar_to', 'similarity_score', 'data_source', 'course_no', 'standardized_course_no', 'numeric_course_id', 'course_title', 'course_description', 'course_abstract', 'course_version', 'course_created_by', 'course_available_from', 'course_discontinued_from', 'course_keywords', 'category_name', 'course_categories', 'sponsoring_dept.', 'course_intended_audience_type_names', 'data_column_0', 'inferred_course', 'data_column_2', 'data_column_3', 'data_column_4', 'data_column_5', 'data_column_6', 'data_column_1', 'course_age_days', 'course_status']
+2025-03-30 15:25:46,962 - src.services.data_processor - INFO - Data types:
+course                                         object
+similar_to                                     object
+similarity_score                              float64
+data_source                                    object
+course_no                                      object
+standardized_course_no                         object
+numeric_course_id                              object
+course_title                                   object
+course_description                             object
+course_abstract                                object
+course_version                                 object
+course_created_by                              object
+course_available_from                  datetime64[ns]
+course_discontinued_from               datetime64[ns]
+course_keywords                                object
+category_name                                  object
+course_categories                              object
+sponsoring_dept.                               object
+course_intended_audience_type_names            object
+data_column_0                                  object
+inferred_course                                object
+data_column_2                                  object
+data_column_3                                  object
+data_column_4                                  object
+data_column_5                                  object
+data_column_6                                  object
+data_column_1                                  object
+course_age_days                               float64
+course_status                                  object
+dtype: object
+2025-03-30 15:25:47,281 - src.services.analyzer - INFO - Starting similarity calculation for 32241 courses
+2025-03-30 15:25:47,281 - src.services.analyzer - INFO - Searching for ID-based duplicates
+2025-03-30 15:25:47,297 - src.services.analyzer - INFO - Processing 1915 numeric ID groups
+2025-03-30 15:25:47,300 - src.services.analyzer - INFO - Processed 100/1915 ID groups
+2025-03-30 15:25:47,302 - src.services.analyzer - INFO - Processed 200/1915 ID groups
+2025-03-30 15:25:47,396 - src.services.analyzer - INFO - Processed 300/1915 ID groups
+2025-03-30 15:25:49,251 - src.services.analyzer - INFO - Processed 400/1915 ID groups
+2025-03-30 15:25:49,588 - src.services.analyzer - INFO - Processed 500/1915 ID groups
+2025-03-30 15:25:51,322 - src.services.analyzer - INFO - Processed 600/1915 ID groups
+2025-03-30 15:25:51,393 - src.services.analyzer - INFO - Processed 700/1915 ID groups
+2025-03-30 15:25:53,379 - src.services.analyzer - INFO - Processed 800/1915 ID groups
+2025-03-30 15:26:02,513 - src.services.analyzer - INFO - Processed 900/1915 ID groups
+2025-03-30 15:26:03,145 - src.services.analyzer - INFO - Processed 1000/1915 ID groups
+2025-03-30 15:26:03,225 - src.services.analyzer - INFO - Processed 1100/1915 ID groups
+2025-03-30 15:26:03,978 - src.services.analyzer - INFO - Processed 1200/1915 ID groups
+2025-03-30 15:26:04,139 - src.services.analyzer - INFO - Processed 1300/1915 ID groups
+2025-03-30 15:26:04,587 - src.services.analyzer - INFO - Processed 1400/1915 ID groups
+2025-03-30 15:26:04,898 - src.services.analyzer - INFO - Processed 1500/1915 ID groups
+2025-03-30 15:26:05,074 - src.services.analyzer - INFO - Processed 1600/1915 ID groups
+2025-03-30 15:26:05,146 - src.services.analyzer - INFO - Processed 1700/1915 ID groups
+2025-03-30 15:26:05,168 - src.services.analyzer - INFO - Processed 1800/1915 ID groups
+2025-03-30 15:26:05,186 - src.services.analyzer - INFO - Processed 1900/1915 ID groups
+2025-03-30 15:26:05,186 - src.services.analyzer - INFO - Found 516438 ID-based duplicate candidates
+2025-03-30 15:26:05,186 - src.services.analyzer - INFO - Starting content-based similarity analysis
+2025-03-30 15:26:05,186 - src.services.analyzer - INFO - Using combined title and description for similarity analysis
+2025-03-30 15:26:05,603 - src.services.analyzer - INFO - Creating TF-IDF vectors
+2025-03-30 15:26:05,604 - src.services.analyzer - INFO - Calculating TF-IDF matrix
+2025-03-30 15:26:07,013 - src.services.analyzer - INFO - Processing content similarity in batches
+2025-03-30 15:26:07,013 - src.services.analyzer - INFO - Processing batch 1/65 (courses 0-500)
+2025-03-30 15:47:53,287 - src.services.analyzer - INFO - Batch 1 complete. Found 9913750 high similarity pairs so far
+2025-03-30 15:47:53,299 - src.services.analyzer - INFO - Processing batch 2/65 (courses 500-1000)
+2025-03-30 16:09:04,348 - src.services.analyzer - INFO - Batch 2 complete. Found 19577500 high similarity pairs so far
+2025-03-30 16:09:04,352 - src.services.analyzer - INFO - Processing batch 3/65 (courses 1000-1500)
+2025-03-30 16:29:51,924 - src.services.analyzer - INFO - Batch 3 complete. Found 28991250 high similarity pairs so far
+2025-03-30 16:29:51,929 - src.services.analyzer - INFO - Processing batch 4/65 (courses 1500-2000)
+2025-03-30 16:50:10,411 - src.services.analyzer - INFO - Batch 4 complete. Found 38155000 high similarity pairs so far
+2025-03-30 16:50:10,415 - src.services.analyzer - INFO - Processing batch 5/65 (courses 2000-2500)
+2025-03-30 17:10:51,330 - src.services.analyzer - INFO - Batch 5 complete. Found 47068750 high similarity pairs so far
+2025-03-30 17:10:51,338 - src.services.analyzer - INFO - Processing batch 6/65 (courses 2500-3000)
+2025-03-30 17:30:20,632 - src.services.analyzer - INFO - Batch 6 complete. Found 55732500 high similarity pairs so far
+2025-03-30 17:30:20,635 - src.services.analyzer - INFO - Processing batch 7/65 (courses 3000-3500)
+2025-03-30 17:50:34,348 - src.services.analyzer - INFO - Batch 7 complete. Found 64146250 high similarity pairs so far
+2025-03-30 17:50:34,353 - src.services.analyzer - INFO - Processing batch 8/65 (courses 3500-4000)
+2025-03-30 18:10:19,733 - src.services.analyzer - INFO - Batch 8 complete. Found 72310000 high similarity pairs so far
+2025-03-30 18:10:19,744 - src.services.analyzer - INFO - Processing batch 9/65 (courses 4000-4500)
+2025-03-30 18:27:36,378 - src.services.analyzer - INFO - Batch 9 complete. Found 80223750 high similarity pairs so far
+2025-03-30 18:27:36,380 - src.services.analyzer - INFO - Processing batch 10/65 (courses 4500-5000)
+2025-03-30 18:46:45,318 - src.services.analyzer - INFO - Batch 10 complete. Found 87887500 high similarity pairs so far
+2025-03-30 18:46:45,330 - src.services.analyzer - INFO - Processing batch 11/65 (courses 5000-5500)

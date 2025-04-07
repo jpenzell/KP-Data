@@ -7,6 +7,8 @@ import pandas as pd
 import logging
 import sys
 from datetime import datetime
+import argparse
+import os
 
 from .services.data_processor import DataProcessor
 from .services.analyzer import LMSAnalyzer
@@ -14,16 +16,20 @@ from .ui.pages.home import render_home_page
 from .ui.pages.analysis import render_analysis_page
 from .models.data_models import AnalysisResults, ValidationResult, Severity
 from .config.analysis_params import LOGGING_CONFIG
+from .ui.app import run_app
 
-# Configure logging
+# Set up logging configuration
+log_dir = os.path.dirname(os.path.abspath(__file__))
+log_file = os.path.join(os.path.dirname(log_dir), f"lms_analyzer_{datetime.now().strftime('%Y%m%d')}.log")
 logging.basicConfig(
-    level=getattr(logging, LOGGING_CONFIG['level']),
-    format=LOGGING_CONFIG['format'],
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(LOGGING_CONFIG['file']),
+        logging.FileHandler(log_file),
         logging.StreamHandler(sys.stdout)
     ]
 )
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,9 +111,9 @@ def process_data(uploaded_files: List) -> tuple[Optional[AnalysisResults], List[
             with st.expander("Preview of processed data", expanded=False):
                 st.dataframe(df.head(5))
             
-            # Initialize analyzer
+            # Initialize analyzer with semantic similarity
             st.write("Running analysis...")
-            analyzer = LMSAnalyzer(df)
+            analyzer = LMSAnalyzer(use_semantic=True)
             progress_bar.progress(0.8)
             
             # Get analysis results
@@ -151,34 +157,22 @@ def display_validation_results(validation_results: List[ValidationResult]):
 
 
 def main():
-    """Main application entry point."""
+    """Main entry point of the application."""
     try:
-        initialize_app()
+        logger.info("Application initialized successfully")
         
-        # Handle file upload
-        uploaded_files = handle_file_upload()
-        if not uploaded_files:
-            return
+        # Initialize components
+        processor = DataProcessor()
         
-        # Process data
-        results, validation_results = process_data(uploaded_files)
-        if not results:
-            return
+        # Initialize analyzer with semantic similarity
+        analyzer = LMSAnalyzer(use_semantic=True)
         
-        # Display validation warnings if any
-        display_validation_results(validation_results)
-        
-        # Render main dashboard
-        render_home_page(results)
-        
-        # Render detailed analysis sections
-        render_analysis_page(results)
-        
-        logger.info("Application completed successfully")
-        
+        # Run app
+        run_app(processor, analyzer)
+            
     except Exception as e:
         logger.error(f"Application error: {str(e)}")
-        st.error("An unexpected error occurred. Please try again later.")
+        st.error(f"An error occurred: {str(e)}")
 
 
 if __name__ == "__main__":

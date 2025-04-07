@@ -170,6 +170,12 @@ class AnalysisResults(BaseModel):
     recommendations: List[Recommendation] = []
     alerts: List[Alert] = []
     summary: Dict[str, Any] = {}
+    analyzer: Optional[Any] = None
+    courses_df: Optional[Any] = None
+    
+    class Config:
+        """Pydantic model configuration."""
+        arbitrary_types_allowed = True
 
 class Course(BaseModel):
     """Course model."""
